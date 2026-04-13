@@ -582,6 +582,8 @@ BOOLEAN _app_downloadupdate (
 	HANDLE hfile;
 	BOOLEAN is_success = FALSE;
 	NTSTATUS status;
+	INT retry_count = 0;
+	const INT max_retries = 3;
 
 	*is_error_ptr = FALSE;
 
@@ -606,33 +608,53 @@ BOOLEAN _app_downloadupdate (
 
 	if (hsession)
 	{
-		status = _r_fs_createfile (
-			&temp_file->sr,
-			FILE_OVERWRITE_IF,
-			FILE_GENERIC_WRITE,
-			FILE_SHARE_READ,
-			FILE_ATTRIBUTE_NORMAL,
-			FILE_SEQUENTIAL_ONLY,
-			FALSE,
-			NULL,
-			&hfile
-		);
-
-		if (!NT_SUCCESS (status))
+		for (retry_count = 0; retry_count <= max_retries; retry_count++)
 		{
-			_r_show_errormessage (hwnd, NULL, status, temp_file->buffer, ET_NATIVE);
+			status = _r_fs_createfile (
+				&temp_file->sr,
+				FILE_OVERWRITE_IF,
+				FILE_GENERIC_WRITE,
+				FILE_SHARE_READ,
+				FILE_ATTRIBUTE_NORMAL,
+				FILE_SEQUENTIAL_ONLY,
+				FALSE,
+				NULL,
+				&hfile
+			);
 
-			*is_error_ptr = TRUE;
-		}
-		else
-		{
+			if (!NT_SUCCESS (status))
+			{
+				_r_show_errormessage (hwnd, NULL, status, temp_file->buffer, ET_NATIVE);
+
+				*is_error_ptr = TRUE;
+				break;
+			}
+
 			_r_inet_initializedownload (&download_info, hfile, &_app_downloadupdate_callback, pbi);
 
 			status = _r_inet_begindownload (hsession, &pbi->download_url->sr, &download_info);
 
 			_r_inet_destroydownload (&download_info);
 
-			if (status != STATUS_SUCCESS)
+			if (status == STATUS_SUCCESS)
+			{
+				SAFE_DELETE_REFERENCE (pbi->download_url);
+
+				_r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
+
+				is_success = TRUE;
+				_r_fs_deletefile (&temp_file->sr, NULL);
+				break;
+			}
+
+			_r_fs_deletefile (&temp_file->sr, NULL);
+
+			if (retry_count < max_retries)
+			{
+				ULONG delay_ms = 1000 * (1 << retry_count);
+				Sleep (delay_ms);
+			}
+			else
 			{
 				_r_show_errormessage (hwnd, NULL, status, pbi->download_url->buffer, ET_WINHTTP);
 
@@ -640,16 +662,6 @@ BOOLEAN _app_downloadupdate (
 
 				*is_error_ptr = TRUE;
 			}
-			else
-			{
-				SAFE_DELETE_REFERENCE (pbi->download_url);
-
-				_r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
-
-				is_success = TRUE;
-			}
-
-			_r_fs_deletefile (&temp_file->sr, NULL);
 		}
 
 		_r_inet_close (hsession);
