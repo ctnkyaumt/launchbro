@@ -1,11 +1,11 @@
 <h1 align="center">chrlauncher</h1>
 
 <p align="center">
-	<a href="https://github.com/launchbro/releases"><img src="https://img.shields.io/github/v/release/launchbro?style=flat-square&include_prereleases&label=version" /></a>
-	<a href="https://github.com/launchbro/releases"><img src="https://img.shields.io/github/downloads/launchbro/total.svg?style=flat-square" /></a>
-	<a href="https://github.com/launchbro/issues"><img src="https://img.shields.io/github/issues-raw/launchbro.svg?style=flat-square&label=issues" /></a>
-	<a href="https://github.com/launchbro/graphs/contributors"><img src="https://img.shields.io/github/contributors/launchbro?style=flat-square" /></a>
-	<a href="https://github.com/launchbro/blob/master/LICENSE"><img src="https://img.shields.io/github/license/launchbro?style=flat-square" /></a>
+	<a href="https://github.com/ctnkyaumt/launchbro/releases"><img src="https://img.shields.io/github/v/release/ctnkyaumt/launchbro?style=flat-square&include_prereleases&label=version" /></a>
+	<a href="https://github.com/ctnkyaumt/launchbro/releases"><img src="https://img.shields.io/github/downloads/ctnkyaumt/launchbro/total.svg?style=flat-square" /></a>
+	<a href="https://github.com/ctnkyaumt/launchbro/issues"><img src="https://img.shields.io/github/issues-raw/ctnkyaumt/launchbro.svg?style=flat-square&label=issues" /></a>
+	<a href="https://github.com/ctnkyaumt/launchbro/graphs/contributors"><img src="https://img.shields.io/github/contributors/ctnkyaumt/launchbro?style=flat-square" /></a>
+	<a href="https://github.com/ctnkyaumt/launchbro/blob/master/LICENSE"><img src="https://img.shields.io/github/license/ctnkyaumt/launchbro?style=flat-square" /></a>
 </p>
 
 -------
