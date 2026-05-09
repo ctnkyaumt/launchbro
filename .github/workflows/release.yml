@@ -121,10 +121,10 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build Release x64
-        run: msbuild .\chrlauncher.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
 
       - name: Build Release Win32
-        run: msbuild .\chrlauncher.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143
 
       - name: Package
         id: package
@@ -132,32 +132,32 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = '${{ steps.version.outputs.version }}'
-          $zipName = "chrlauncher-$version-bin.zip"
+          $zipName = "launchbro-$version-bin.zip"
 
           $binRoot = Join-Path $PWD 'bin'
           if (!(Test-Path $binRoot)) { throw "Missing .\\bin output folder" }
 
-          New-Item -ItemType Directory -Force -Path .\dist\chrlauncher | Out-Null
+          New-Item -ItemType Directory -Force -Path .\dist\launchbro | Out-Null
 
           $targets = @(
-            @{ Folder = '64'; Exe = 'chrlauncher.exe' },
-            @{ Folder = '32'; Exe = 'chrlauncher.exe' }
+            @{ Folder = '64'; Exe = 'launchbro.exe' },
+            @{ Folder = '32'; Exe = 'launchbro.exe' }
           )
 
           foreach ($t in $targets) {
             $src = Join-Path $binRoot $t.Folder
             if (Test-Path (Join-Path $src $t.Exe)) {
-              $dst = Join-Path $PWD ("dist\\chrlauncher\\" + $t.Folder)
+              $dst = Join-Path $PWD ("dist\\launchbro\\" + $t.Folder)
               New-Item -ItemType Directory -Force -Path $dst | Out-Null
               Copy-Item -Recurse -Force -Path (Join-Path $src '*') -Destination $dst -Exclude *.pdb,*.ipdb,*.iobj
             }
           }
 
-          if (!(Test-Path .\dist\chrlauncher\64\chrlauncher.exe) -and !(Test-Path .\dist\chrlauncher\32\chrlauncher.exe)) {
-            throw "No packaged outputs were found (expected dist\\chrlauncher\\{32,64}\\chrlauncher.exe)"
+          if (!(Test-Path .\dist\launchbro\64\launchbro.exe) -and !(Test-Path .\dist\launchbro\32\launchbro.exe)) {
+            throw "No packaged outputs were found (expected dist\\launchbro\\{32,64}\\launchbro.exe)"
           }
 
-          Compress-Archive -Force -Path .\dist\chrlauncher -DestinationPath (Join-Path $PWD $zipName)
+          Compress-Archive -Force -Path .\dist\launchbro -DestinationPath (Join-Path $PWD $zipName)
           "zip=$zipName" >> $env:GITHUB_OUTPUT
 
       - name: Generate release notes

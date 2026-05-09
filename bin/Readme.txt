@@ -1,4 +1,4 @@
-chrlauncher
+launchbro
 
 Small and very fast portable launcher and updater for Chromium.
 
@@ -7,24 +7,24 @@ System requirements:
 - An SSE2-capable CPU
 
 Default browser:
-chrlauncher has feature to use portable Chromium as default browser and it will be open links from another programs through chrlauncher.
+launchbro has feature to use portable Chromium as default browser and it will be open links from another programs through launchbro.
 - start "SetDefaultBrowser.bat" (as admin).
-- start "Control panel" -> "Default programs" -> "Set your default programs" -> "chrlauncher" and set all checkboxes on.
+- start "Control panel" -> "Default programs" -> "Set your default programs" -> "launchbro" and set all checkboxes on.
 
 Command line:
 There is list of arguments overrides .ini options.
 -autodownload - auto download update and install it!
--bringtofront - bring chrlauncher window to front when download started
+-bringtofront - bring launchbro window to front when download started
 -forcecheck - force update checking
 -wait - start browser only when check/download/install update complete
--update - use chrlauncher as updater, but does not start Chromium
+-update - use launchbro as updater, but does not start Chromium
 
 Supported browser:
 - as launcher - Chromium based (like Google Chrome, Opera, Yandex Browser, Vivaldi, etc.) and Firefox based (Mozilla Firefox, Basilisk, Pale Moon, Waterfox, etc.)
 - as updater - Chromium only
 
 Settings:
-[chrlauncher]
+[launchbro]
 
 # Custom Chromium update URL (string):
 #ChromiumUpdateUrl=https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string
@@ -38,7 +38,7 @@ ChromiumCommandLine=--flag-switches-begin --user-data-dir=..\profile --no-defaul
 ChromiumBinary=chrome.exe
 
 # Chromium binaries directory (string):
-# Relative (to chrlauncher directory) or full path (env. variables supported).
+# Relative (to launchbro directory) or full path (env. variables supported).
 ChromiumDirectory=.\bin
 
 # Set Chromium binaries architecture (integer):
@@ -54,10 +54,10 @@ ChromiumArchitecture=0
 # true	-> auto download update and install it!
 ChromiumAutoDownload=false
 
-# Bring chrlauncher window when download started (boolean)
+# Bring launchbro window when download started (boolean)
 #
 # false	-> don't bring main window to front automatically
-# true	-> bring chrlauncher window to front when download started (default)
+# true	-> bring launchbro window to front when download started (default)
 ChromiumBringToFront=true
 
 # Set download in foreground mode (boolean):
@@ -66,7 +66,7 @@ ChromiumBringToFront=true
 # true	-> start browser only when check/download/install update complete (default)
 ChromiumWaitForDownloadEnd=true
 
-# Use chrlauncher as updater, but does not start Chromium (boolean):
+# Use launchbro as updater, but does not start Chromium (boolean):
 #
 # false	-> update & start Chromium (default)
 # true	-> download & install Chromium update without start

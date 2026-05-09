@@ -1,6 +1,6 @@
 @echo off
 
 cd ..\builder
-call build chrlauncher 2.7
+call build launchbro 2.7
 
 pause

@@ -1,4 +1,4 @@
-<h1 align="center">chrlauncher</h1>
+<h1 align="center">launchbro</h1>
 
 <p align="center">
 	<a href="https://github.com/ctnkyaumt/launchbro/releases"><img src="https://img.shields.io/github/v/release/ctnkyaumt/launchbro?style=flat-square&include_prereleases&label=version" /></a>
@@ -11,7 +11,7 @@
 -------
 
 <p align="center">
-	<img src="/images/chrlauncher.png?hgcv" />
+	<img src="/images/launchbro.png?hgcv" />
 </p>
 
 ### Description:
@@ -23,25 +23,25 @@ Small and very fast portable launcher and updater for Chromium.
 - <s>KB2533623</s> KB3063858 update for Windows 7 was required [[x64](https://www.microsoft.com/en-us/download/details.aspx?id=47442) / [x32](https://www.microsoft.com/en-us/download/details.aspx?id=47409)]
 
 ### GPG Signature:
-Binaries have GPG signature `chrlauncher.exe.sig` in application folder.
+Binaries have GPG signature `launchbro.exe.sig` in application folder.
 
 - Public key: [pubkey.asc](https://raw.githubusercontent.com/henrypp/builder/master/pubkey.asc) ([pgpkeys.eu](https://pgpkeys.eu/pks/lookup?op=index&fingerprint=on&search=0x5635B5FD))
 - Key ID: 0x5635B5FD
 - Fingerprint: D985 2361 1524 AB29 BE73 30AC 2881 20A7 5635 B5FD
 
 ### Default browser:
-chrlauncher has feature to use portable Chromium as default browser and it will be open links from another programs through chrlauncher.
+launchbro has feature to use portable Chromium as default browser and it will be open links from another programs through launchbro.
 - start "SetDefaultBrowser.bat" (as admin).
-- start "Control panel" -> "Default programs" -> "Set your default programs" -> "chrlauncher" and set all checkboxes on.
+- start "Control panel" -> "Default programs" -> "Set your default programs" -> "launchbro" and set all checkboxes on.
 
 ### Command line:
 There is list of arguments overrides .ini options
 ~~~
 -autodownload - auto download update and install it!
--bringtofront - bring chrlauncher window to front when download started
+-bringtofront - bring launchbro window to front when download started
 -forcecheck - force update checking
 -wait - start browser only when check/download/install update complete
--update - use chrlauncher as updater, but does not start Chromium
+-update - use launchbro as updater, but does not start Chromium
 ~~~
 
 ### Supported browser:
@@ -49,11 +49,11 @@ There is list of arguments overrides .ini options
 - as updater - Chromium, r3dfox, Iceweasel
 
 ### Chrome++:
-- By default Chromium encrypt profile with user SID, which is disabled by [Chrome++](https://github.com/Bush2021/chrome_plus), so it is recomended. Starting with version 2.7 of chrlauncher it added support of Chrome++.
+- By default Chromium encrypt profile with user SID, which is disabled by [Chrome++](https://github.com/Bush2021/chrome_plus), so it is recomended. Starting with version 2.7 of launchbro it added support of Chrome++.
 
 ### Settings:
 ~~~ini
-[chrlauncher]
+[launchbro]
 
 # Custom Chromium update URL (string):
 #ChromiumUpdateUrl=https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string
@@ -75,7 +75,7 @@ ChromiumCommandLine=--flag-switches-begin --user-data-dir=..\profile --no-defaul
 #ChromiumBinary=chrome.exe
 
 # Chromium binaries directory (string):
-# Relative (to chrlauncher directory) or full path (env. variables supported).
+# Relative (to launchbro directory) or full path (env. variables supported).
 ChromiumDirectory=.\bin
 
 # Set Chromium binaries architecture (integer):
@@ -91,10 +91,10 @@ ChromiumArchitecture=0
 # true	-> auto download update and install it!
 ChromiumAutoDownload=false
 
-# Bring chrlauncher window when download started (boolean)
+# Bring launchbro window when download started (boolean)
 #
 # false	-> don't bring main window to front automatically
-# true	-> bring chrlauncher window to front when download started (default)
+# true	-> bring launchbro window to front when download started (default)
 ChromiumBringToFront=true
 
 # Set download in foreground mode (boolean):
@@ -103,7 +103,7 @@ ChromiumBringToFront=true
 # true	-> start browser only when check/download/install update complete (default)
 ChromiumWaitForDownloadEnd=true
 
-# Use chrlauncher as updater, but does not start Chromium (boolean):
+# Use launchbro as updater, but does not start Chromium (boolean):
 #
 # false	-> update & start Chromium (default)
 # true	-> download & install Chromium update without start
@@ -183,13 +183,13 @@ ChromiumDeleteToRecycle=true
 #Proxy=127.0.0.1:80
 ~~~
 ### FAQ:
-- [If you lost all setting and extensions when copy Chromium to another PC (answer)](https://github.com/henrypp/chrlauncher/issues/116#issuecomment-444426692)
-- [How to force check for an update every chrlauncher start?](https://github.com/henrypp/chrlauncher/issues/92#issuecomment-343274418)
-- [How to host the Chromium package zip on custom network?](https://github.com/henrypp/chrlauncher/issues/86)
-- [Can't sign-in to Chromium](https://github.com/henrypp/chrlauncher/issues/115#issuecomment-444268533)
-- [Set proxy configuration for a chrlauncher](https://github.com/henrypp/chrlauncher/issues/61#issuecomment-439295515)
-- [Pass on chrlauncher arguments into Chromium](https://github.com/henrypp/chrlauncher/issues/76#issuecomment-312444105)
-- [Disable annoying chrlauncher window popup](https://github.com/henrypp/chrlauncher/issues/96#issuecomment-439294915)
-- [Is it possible to downgrade Chromium version?](https://github.com/henrypp/chrlauncher/issues/112#issuecomment-440940865)
-- [Fix for duplicated taskbar icons creation](https://github.com/henrypp/chrlauncher/issues/49#issuecomment-289285155)
+- [If you lost all setting and extensions when copy Chromium to another PC (answer)](https://github.com/henrypp/launchbro/issues/116#issuecomment-444426692)
+- [How to force check for an update every launchbro start?](https://github.com/henrypp/launchbro/issues/92#issuecomment-343274418)
+- [How to host the Chromium package zip on custom network?](https://github.com/henrypp/launchbro/issues/86)
+- [Can't sign-in to Chromium](https://github.com/henrypp/launchbro/issues/115#issuecomment-444268533)
+- [Set proxy configuration for a launchbro](https://github.com/henrypp/launchbro/issues/61#issuecomment-439295515)
+- [Pass on launchbro arguments into Chromium](https://github.com/henrypp/launchbro/issues/76#issuecomment-312444105)
+- [Disable annoying launchbro window popup](https://github.com/henrypp/launchbro/issues/96#issuecomment-439294915)
+- [Is it possible to downgrade Chromium version?](https://github.com/henrypp/launchbro/issues/112#issuecomment-440940865)
+- [Fix for duplicated taskbar icons creation](https://github.com/henrypp/launchbro/issues/49#issuecomment-289285155)
 

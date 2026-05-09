@@ -1,4 +1,4 @@
-// chrlauncher
+// launchbro
 // Copyright (c) 2015-2025 Henry++
 
 #include "routine.h"
@@ -10,7 +10,7 @@
 #include <taskschd.h>
 #include <oleauto.h>
 
-static const WCHAR TASKUPDATE_TASK_NAME[] = L"chrlauncher\\AutoUpdate";
+static const WCHAR TASKUPDATE_TASK_NAME[] = L"launchbro\\AutoUpdate";
 
 typedef struct _CLOSE_BROWSER_CONTEXT
 {
@@ -278,7 +278,7 @@ BOOLEAN _app_taskupdate_setstartwhenavailable ()
 	if (FAILED (status))
 		goto CleanupExit;
 
-	folder_path = SysAllocString (L"\\chrlauncher");
+	folder_path = SysAllocString (L"\\launchbro");
 	task_name = SysAllocString (L"AutoUpdate");
 
 	if (!folder_path || !task_name)

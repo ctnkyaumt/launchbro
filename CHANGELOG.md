@@ -39,7 +39,7 @@ v2.5.7 (17 November 2019)
 
 v2.5.6 (9 March 2019)
 - added better search for browser executables
-- fixed working with multiple chrlauncher copies
+- fixed working with multiple launchbro copies
 - fixed firefox based browsers support
 
 v2.5.5 (10 February 2019)
@@ -74,7 +74,7 @@ v2.5.1 (18 November 2018)
 - updated install script
 
 v2.5 (3 November 2018)
-- added localization support (please use example.txt, not chrlauncher.lng file)
+- added localization support (please use example.txt, not launchbro.lng file)
 - added proxy support (issue #108)
 - fixed unpacking some zip packages (issue #107 & #100)
 - fixed wow64 related bugs
@@ -127,7 +127,7 @@ v2.0 (12 January 2017)
 - fixed run Chromium when directory contain spaces
 - fixed race conditions on download
 - fixed relative/environment path generation
-- fixed open links if chrlauncher set as default browser
+- fixed open links if launchbro set as default browser
 - removed PPAPI from package
 - updated readme
 - code cleanup
@@ -163,7 +163,7 @@ v1.9 (19 April 2016)
 
 v1.8 (19 March 2016)
 + now distributed under MIT license
-+ support to download unofficial build with codecs (see chrlauncher.ini)
++ support to download unofficial build with codecs (see launchbro.ini)
 - updated PPAPI to 21.0.0.182
 
 v1.7 (23 February 2016)
@@ -173,7 +173,7 @@ v1.7 (23 February 2016)
 - stability improvements
 
 v1.6 (22 January 2016)
-+ added script to set chrlauncher as default browser
++ added script to set launchbro as default browser
 - cleanup Chromium package on extract
 - removed Mozilla Firefox support (because his have native autoupdater)
 - minor bug fixes
@@ -195,12 +195,12 @@ v1.2 (30 November 2015)
 + added checking for installation package is really Chromium archive
 + added exit confirmation when downloading/installing
 - fixed architecture detection on various systems
-- changed settings description (see chrlauncher.ini)
+- changed settings description (see launchbro.ini)
 
 v1.1 (29 November 2015)
 + code rewritten on c++
 + added select for downloading architecture
-+ added new settings (see chrlauncher.ini)
++ added new settings (see launchbro.ini)
 + more information about update
 
 v1.0 (26 November 2015)

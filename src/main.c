@@ -1,4 +1,4 @@
-// chrlauncher
+// launchbro
 // Copyright (c) 2015-2025 Henry++
 
 #include "routine.h"
@@ -7,6 +7,7 @@
 #include "rapp.h"
 
 #include "resource.h"
+#include <shellapi.h>
 #include <tlhelp32.h>
 
 BROWSER_INFORMATION browser_info = {0};
@@ -15,6 +16,52 @@ R_QUEUED_LOCK lock_download = PR_QUEUED_LOCK_INIT;
 R_QUEUED_LOCK lock_thread = PR_QUEUED_LOCK_INIT;
 
 R_WORKQUEUE workqueue;
+
+HICON hicon_browser_small = NULL;
+HICON hicon_browser_large = NULL;
+
+extern BOOLEAN _app_is_firefox_fork (PBROWSER_INFORMATION pbi);
+
+VOID _app_setbrowsericon (
+	_In_ HWND hwnd,
+	_In_ PBROWSER_INFORMATION pbi
+)
+{
+	SHFILEINFOW shfi = {0};
+
+	if (hicon_browser_small)
+	{
+		DestroyIcon (hicon_browser_small);
+		hicon_browser_small = NULL;
+	}
+
+	if (hicon_browser_large)
+	{
+		DestroyIcon (hicon_browser_large);
+		hicon_browser_large = NULL;
+	}
+
+	if (!pbi || !pbi->binary_path || _r_obj_isstringempty (pbi->binary_path))
+		return;
+
+	if (!_r_fs_exists (&pbi->binary_path->sr))
+		return;
+
+	if (!_app_is_firefox_fork (pbi))
+		return;
+
+	if (SHGetFileInfoW (pbi->binary_path->buffer, 0, &shfi, sizeof (shfi), SHGFI_ICON | SHGFI_SMALLICON))
+	{
+		hicon_browser_small = shfi.hIcon;
+		SendMessageW (hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hicon_browser_small);
+	}
+
+	if (SHGetFileInfoW (pbi->binary_path->buffer, 0, &shfi, sizeof (shfi), SHGFI_ICON))
+	{
+		hicon_browser_large = shfi.hIcon;
+		SendMessageW (hwnd, WM_SETICON, ICON_BIG, (LPARAM)hicon_browser_large);
+	}
+}
 
 VOID _app_set_lastcheck (
 	_In_ PBROWSER_INFORMATION pbi
@@ -512,11 +559,13 @@ INT_PTR CALLBACK DlgProc (
 
 			icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-			hicon = _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
-
 			browser_info.hwnd = hwnd;
 
 			_app_init_browser_info (&browser_info);
+
+			_app_setbrowsericon (hwnd, &browser_info);
+
+			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			is_hidden = (_r_queuedlock_islocked (&lock_download) || _app_isupdatedownloaded (&browser_info)) ? FALSE : TRUE;
 
@@ -615,7 +664,9 @@ INT_PTR CALLBACK DlgProc (
 
 			icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-			hicon = _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
+			_app_setbrowsericon (hwnd, &browser_info);
+
+			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			is_hidden = (_r_queuedlock_islocked (&lock_download) || _app_isupdatedownloaded (&browser_info)) ? FALSE : TRUE;
 
@@ -634,7 +685,9 @@ INT_PTR CALLBACK DlgProc (
 
 			icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-			hicon = _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
+			_app_setbrowsericon (hwnd, &browser_info);
+
+			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			_r_tray_setinfo (hwnd, &GUID_TrayIcon, hicon, _r_app_getname ());
 
@@ -663,6 +716,18 @@ INT_PTR CALLBACK DlgProc (
 		case WM_DESTROY:
 		{
 			_r_tray_destroy (hwnd, &GUID_TrayIcon);
+
+			if (hicon_browser_small)
+			{
+				DestroyIcon (hicon_browser_small);
+				hicon_browser_small = NULL;
+			}
+
+			if (hicon_browser_large)
+			{
+				DestroyIcon (hicon_browser_large);
+				hicon_browser_large = NULL;
+			}
 
 			if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
 			{

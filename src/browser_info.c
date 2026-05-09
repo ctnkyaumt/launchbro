@@ -1,4 +1,4 @@
-// chrlauncher
+// launchbro
 // Copyright (c) 2015-2025 Henry++
 
 #include "routine.h"
@@ -836,4 +836,17 @@ VOID _app_init_browser_info (
 		pbi->is_waitdownloadend = TRUE;
 	}
 
+}
+
+BOOLEAN _app_is_firefox_fork (
+	_In_ PBROWSER_INFORMATION pbi
+)
+{
+	R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
+	R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
+
+	if (!pbi || !pbi->browser_type)
+		return FALSE;
+
+	return _r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) || _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE);
 }
