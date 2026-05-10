@@ -105,6 +105,14 @@ VOID _app_perform_migration (
 	_In_ HWND hwnd
 );
 
+VOID _app_setstatus (
+	_In_ HWND hwnd,
+	_In_opt_ HWND htaskbar,
+	_In_opt_ LPCWSTR string,
+	_In_opt_ ULONG64 total_read,
+	_In_opt_ ULONG64 total_length
+);
+
 // profile management / uninstall
 VOID _app_export_profile (
 	_In_ HWND hwnd

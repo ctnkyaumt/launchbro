@@ -640,7 +640,6 @@ VOID _app_apply_self_update (
 BOOLEAN _app_check_migration ()
 {
 	PR_STRING app_root;
-	PR_STRING parent_dir;
 	WCHAR parent_buf[4096] = {0};
 	PR_STRING chrlauncher_path;
 	BOOLEAN found = FALSE;
