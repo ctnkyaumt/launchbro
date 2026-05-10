@@ -403,7 +403,7 @@ static BOOLEAN NTAPI _app_self_download_callback (
 	HWND hwnd = (HWND)lparam;
 
 	if (hwnd)
-		_app_setstatus (hwnd, NULL, _r_locale_getstring (IDS_UPDATE_DOWNLOADING), total_written, total_length);
+		_app_setstatus (hwnd, NULL, NULL, _r_locale_getstring (IDS_UPDATE_DOWNLOADING), total_written, total_length);
 
 	return TRUE;
 }
@@ -764,4 +764,3 @@ CleanupExit:
 	if (app_root)
 		_r_obj_dereference (app_root);
 }
-

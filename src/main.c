@@ -17,50 +17,96 @@ R_QUEUED_LOCK lock_thread = PR_QUEUED_LOCK_INIT;
 
 R_WORKQUEUE workqueue;
 
-HICON hicon_browser_small = NULL;
-HICON hicon_browser_large = NULL;
+typedef enum _APP_ICON_STATE
+{
+	APP_ICON_STATE_IDLE = 0,
+	APP_ICON_STATE_CHROMIUM,
+	APP_ICON_STATE_FIREFOX
+} APP_ICON_STATE;
+
+HICON hicon_app_small = NULL;
+HICON hicon_app_large = NULL;
+APP_ICON_STATE current_icon_state = APP_ICON_STATE_IDLE;
 
 extern BOOLEAN _app_is_firefox_fork (PBROWSER_INFORMATION pbi);
 
-VOID _app_setbrowsericon (
-	_In_ HWND hwnd,
-	_In_ PBROWSER_INFORMATION pbi
+static INT _app_geticonresourceid (
+	_In_ APP_ICON_STATE icon_state
 )
 {
-	SHFILEINFOW shfi = {0};
-
-	if (hicon_browser_small)
+	switch (icon_state)
 	{
-		DestroyIcon (hicon_browser_small);
-		hicon_browser_small = NULL;
+		case APP_ICON_STATE_CHROMIUM:
+			return IDI_CHROMIUM;
+
+		case APP_ICON_STATE_FIREFOX:
+			return IDI_FIREFOX;
+
+		default:
+			return IDI_MAIN;
+	}
+}
+
+VOID _app_seticonstate (
+	_In_ HWND hwnd,
+	_In_opt_ PBROWSER_INFORMATION pbi,
+	_In_ BOOLEAN is_busy,
+	_In_ BOOLEAN is_forced
+)
+{
+	APP_ICON_STATE icon_state;
+	INT icon_resource;
+	LONG dpi_value;
+	LONG icon_small;
+	LONG icon_large;
+
+	if (is_busy && pbi)
+	{
+		icon_state = _app_is_firefox_fork (pbi) ? APP_ICON_STATE_FIREFOX : APP_ICON_STATE_CHROMIUM;
+	}
+	else
+	{
+		icon_state = APP_ICON_STATE_IDLE;
 	}
 
-	if (hicon_browser_large)
-	{
-		DestroyIcon (hicon_browser_large);
-		hicon_browser_large = NULL;
-	}
-
-	if (!pbi || !pbi->binary_path || _r_obj_isstringempty (pbi->binary_path))
+	if (!is_forced && current_icon_state == icon_state && hicon_app_small && hicon_app_large)
 		return;
 
-	if (!_r_fs_exists (&pbi->binary_path->sr))
-		return;
+	current_icon_state = icon_state;
+	icon_resource = _app_geticonresourceid (icon_state);
+	dpi_value = _r_dc_gettaskbardpi ();
+	icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
+	icon_large = _r_dc_getsystemmetrics (SM_CXICON, dpi_value);
 
-	if (!_app_is_firefox_fork (pbi))
-		return;
-
-	if (SHGetFileInfoW (pbi->binary_path->buffer, 0, &shfi, sizeof (shfi), SHGFI_ICON | SHGFI_SMALLICON))
+	if (hicon_app_small)
 	{
-		hicon_browser_small = shfi.hIcon;
-		SendMessageW (hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hicon_browser_small);
+		DestroyIcon (hicon_app_small);
+		hicon_app_small = NULL;
 	}
 
-	if (SHGetFileInfoW (pbi->binary_path->buffer, 0, &shfi, sizeof (shfi), SHGFI_ICON))
+	if (hicon_app_large)
 	{
-		hicon_browser_large = shfi.hIcon;
-		SendMessageW (hwnd, WM_SETICON, ICON_BIG, (LPARAM)hicon_browser_large);
+		DestroyIcon (hicon_app_large);
+		hicon_app_large = NULL;
 	}
+
+	hicon_app_small = (HICON)LoadImageW (_r_sys_getimagebase (), MAKEINTRESOURCEW (icon_resource), IMAGE_ICON, icon_small, icon_small, LR_DEFAULTCOLOR);
+	hicon_app_large = (HICON)LoadImageW (_r_sys_getimagebase (), MAKEINTRESOURCEW (icon_resource), IMAGE_ICON, icon_large, icon_large, LR_DEFAULTCOLOR);
+
+	if (!hicon_app_small)
+		hicon_app_small = CopyIcon (_r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (icon_resource), icon_small));
+
+	if (!hicon_app_large)
+		hicon_app_large = CopyIcon (_r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (icon_resource), icon_large));
+
+	if (hicon_app_small)
+		SendMessageW (hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hicon_app_small);
+
+	if (hicon_app_large)
+		SendMessageW (hwnd, WM_SETICON, ICON_BIG, (LPARAM)hicon_app_large);
+
+	if (hicon_app_small)
+		_r_tray_setinfo (hwnd, &GUID_TrayIcon, hicon_app_small, _r_app_getname ());
 }
 
 VOID _app_set_lastcheck (
@@ -92,6 +138,7 @@ VOID _app_update_browser_info (
 VOID _app_setstatus (
 	_In_ HWND hwnd,
 	_In_opt_ HWND htaskbar,
+	_In_opt_ PBROWSER_INFORMATION pbi,
 	_In_opt_ LPCWSTR string,
 	_In_opt_ ULONG64 total_read,
 	_In_opt_ ULONG64 total_length
@@ -391,7 +438,7 @@ VOID _app_thread_check (
 		{
 			_r_tray_popup (hwnd, &GUID_TrayIcon, NIIF_ERROR, _r_app_getname (), _r_locale_getstring (IDS_STATUS_ERROR)); // just inform user
 
-			_app_setstatus (hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_ERROR), 0, 0);
+			_app_setstatus (hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_ERROR), 0, 0);
 		}
 
 		is_stayopen = TRUE;
@@ -558,9 +605,9 @@ INT_PTR CALLBACK DlgProc (
 
 			_app_init_browser_info (&browser_info);
 
-			_app_setbrowsericon (hwnd, &browser_info);
+			_app_seticonstate (hwnd, &browser_info, FALSE, TRUE);
 
-			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
+			hicon = hicon_app_small ? hicon_app_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			is_hidden = (_r_queuedlock_islocked (&lock_download) || _app_isupdatedownloaded (&browser_info)) ? FALSE : TRUE;
 
@@ -665,9 +712,9 @@ INT_PTR CALLBACK DlgProc (
 
 			icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-			_app_setbrowsericon (hwnd, &browser_info);
+			_app_seticonstate (hwnd, &browser_info, FALSE, TRUE);
 
-			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
+			hicon = hicon_app_small ? hicon_app_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			is_hidden = (_r_queuedlock_islocked (&lock_download) || _app_isupdatedownloaded (&browser_info)) ? FALSE : TRUE;
 
@@ -686,9 +733,9 @@ INT_PTR CALLBACK DlgProc (
 
 			icon_small = _r_dc_getsystemmetrics (SM_CXSMICON, dpi_value);
 
-			_app_setbrowsericon (hwnd, &browser_info);
+			_app_seticonstate (hwnd, &browser_info, FALSE, TRUE);
 
-			hicon = hicon_browser_small ? hicon_browser_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
+			hicon = hicon_app_small ? hicon_app_small : _r_sys_loadsharedicon (_r_sys_getimagebase (), MAKEINTRESOURCE (IDI_MAIN), icon_small);
 
 			_r_tray_setinfo (hwnd, &GUID_TrayIcon, hicon, _r_app_getname ());
 
@@ -718,16 +765,16 @@ INT_PTR CALLBACK DlgProc (
 		{
 			_r_tray_destroy (hwnd, &GUID_TrayIcon);
 
-			if (hicon_browser_small)
+			if (hicon_app_small)
 			{
-				DestroyIcon (hicon_browser_small);
-				hicon_browser_small = NULL;
+				DestroyIcon (hicon_app_small);
+				hicon_app_small = NULL;
 			}
 
-			if (hicon_browser_large)
+			if (hicon_app_large)
 			{
-				DestroyIcon (hicon_browser_large);
-				hicon_browser_large = NULL;
+				DestroyIcon (hicon_app_large);
+				hicon_app_large = NULL;
 			}
 
 			if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE))

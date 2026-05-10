@@ -18,6 +18,7 @@ VOID _app_update_browser_info (
 VOID _app_setstatus (
 	_In_ HWND hwnd,
 	_In_opt_ HWND htaskbar,
+	_In_opt_ PBROWSER_INFORMATION pbi,
 	_In_opt_ LPCWSTR string,
 	_In_opt_ ULONG64 total_read,
 	_In_opt_ ULONG64 total_length
@@ -425,7 +426,7 @@ BOOLEAN _app_checkupdate (
 	is_exists = _r_fs_exists (&pbi->binary_path->sr);
 	is_updaterequired = _app_isupdaterequired (pbi);
 
-	_app_setstatus (hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_CHECK), 0, 0);
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_CHECK), 0, 0);
 
 	SAFE_DELETE_REFERENCE (pbi->new_version);
 	pbi->timestamp = 0;
@@ -549,7 +550,7 @@ BOOLEAN _app_checkupdate (
 		_r_obj_dereference (hashtable);
 	}
 
-	_app_setstatus (hwnd, pbi->htaskbar, NULL, 0, 0);
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
 
 	return is_success;
 }
@@ -564,7 +565,7 @@ BOOLEAN NTAPI _app_downloadupdate_callback (
 
 	pbi = lparam;
 
-	_app_setstatus (pbi->hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_DOWNLOAD), total_written, total_length);
+	_app_setstatus (pbi->hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_DOWNLOAD), total_written, total_length);
 
 	return TRUE;
 }
@@ -598,7 +599,7 @@ BOOLEAN _app_downloadupdate (
 
 	_r_fs_deletefile (&pbi->cache_path->sr, NULL);
 
-	_app_setstatus (hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_DOWNLOAD), 0, 1);
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_DOWNLOAD), 0, 1);
 
 	_r_queuedlock_acquireshared (&lock_download);
 
@@ -674,7 +675,7 @@ BOOLEAN _app_downloadupdate (
 
 	_r_obj_dereference (temp_file);
 
-	_app_setstatus (hwnd, pbi->htaskbar, NULL, 0, 0);
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
 
 	return is_success;
 }

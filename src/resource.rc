@@ -173,7 +173,9 @@ END
 //
 // Icon resources
 //
-IDI_MAIN		ICON		"res\\100.ico"
+IDI_MAIN		ICON		"..\\images\\launchbro.ico"
+IDI_CHROMIUM	ICON		"..\\images\\chromium.ico"
+IDI_FIREFOX		ICON		"..\\images\\ff.ico"
 
 //
 // Manifest resource

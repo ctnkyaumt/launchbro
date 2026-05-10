@@ -63,6 +63,8 @@
 
 // Icons
 #define IDI_MAIN 100
+#define IDI_CHROMIUM 101
+#define IDI_FIREFOX 102
 
 // Strings
 #define IDS_FILE 1

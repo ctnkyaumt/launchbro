@@ -22,6 +22,7 @@ extern R_QUEUED_LOCK lock_download;
 VOID _app_setstatus (
 	_In_ HWND hwnd,
 	_In_opt_ HWND htaskbar,
+	_In_opt_ PBROWSER_INFORMATION pbi,
 	_In_opt_ LPCWSTR string,
 	_In_opt_ ULONG64 total_read,
 	_In_opt_ ULONG64 total_length
@@ -186,7 +187,7 @@ SRes _app_unpack_7zip (
 		{
 			total_read += SzArEx_GetFileSize (&db, i);
 
-			_app_setstatus (hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_INSTALL), total_read, total_size);
+			_app_setstatus (hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_INSTALL), total_read, total_size);
 
 			// create directory if not-exist
 			sub_dir = _r_path_getbasedirectory (&dest_path->sr);
@@ -369,7 +370,7 @@ BOOLEAN _app_unpack_zip (
 			&path->sr
 		);
 
-		_app_setstatus (hwnd, pbi->htaskbar, _r_locale_getstring (IDS_STATUS_INSTALL), total_read, total_size);
+		_app_setstatus (hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_INSTALL), total_read, total_size);
 
 		if (mz_zip_reader_is_file_a_directory (&zip_archive, i))
 		{
@@ -470,7 +471,7 @@ BOOLEAN _app_installupdate (
 
 	_r_sys_setthreadexecutionstate (ES_CONTINUOUS);
 
-	_app_setstatus (hwnd, pbi->htaskbar, NULL, 0, 0);
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
 
 	return (status == SZ_OK) ? TRUE : FALSE;
 }

@@ -81,12 +81,24 @@ VOID _app_update_browser_info (
 VOID _app_setstatus (
 	_In_ HWND hwnd,
 	_In_opt_ HWND htaskbar,
+	_In_opt_ PBROWSER_INFORMATION pbi,
 	_In_opt_ LPCWSTR string,
 	_In_opt_ ULONG64 total_read,
 	_In_opt_ ULONG64 total_length
 )
 {
 	LONG64 percent = 0;
+	BOOLEAN is_update_activity = FALSE;
+
+	if (pbi && string)
+	{
+		is_update_activity =
+			(lstrcmpW (string, _r_locale_getstring (IDS_STATUS_CHECK)) == 0) ||
+			(lstrcmpW (string, _r_locale_getstring (IDS_STATUS_DOWNLOAD)) == 0) ||
+			(lstrcmpW (string, _r_locale_getstring (IDS_STATUS_INSTALL)) == 0);
+	}
+
+	_app_seticonstate (hwnd, pbi, is_update_activity, FALSE);
 
 	if (htaskbar)
 	{

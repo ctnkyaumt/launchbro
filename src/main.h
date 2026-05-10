@@ -108,9 +108,17 @@ VOID _app_perform_migration (
 VOID _app_setstatus (
 	_In_ HWND hwnd,
 	_In_opt_ HWND htaskbar,
+	_In_opt_ PBROWSER_INFORMATION pbi,
 	_In_opt_ LPCWSTR string,
 	_In_opt_ ULONG64 total_read,
 	_In_opt_ ULONG64 total_length
+);
+
+VOID _app_seticonstate (
+	_In_ HWND hwnd,
+	_In_opt_ PBROWSER_INFORMATION pbi,
+	_In_ BOOLEAN is_busy,
+	_In_ BOOLEAN is_forced
 );
 
 // profile management / uninstall
@@ -125,4 +133,3 @@ VOID _app_import_profile (
 VOID _app_uninstall_app (
 	_In_ HWND hwnd
 );
-
