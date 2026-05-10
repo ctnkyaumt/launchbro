@@ -93,6 +93,32 @@ static BOOLEAN _app_reg_write_string (
 	return (status == ERROR_SUCCESS);
 }
 
+static BOOLEAN _app_reg_read_open_command (
+	_In_ PR_STRING prog_id,
+	_Out_ PR_STRING* command
+)
+{
+	PR_STRING subkey;
+	BOOLEAN is_success;
+
+	if (!prog_id || _r_obj_isstringempty (prog_id) || !command)
+		return FALSE;
+
+	if (_app_reg_read_string (HKEY_CLASSES_ROOT, prog_id->buffer, L"shell\\open\\command", command))
+		return TRUE;
+
+	subkey = _r_format_string (L"Software\\Classes\\%s", prog_id->buffer);
+
+	if (!subkey)
+		return FALSE;
+
+	is_success = _app_reg_read_string (HKEY_CURRENT_USER, subkey->buffer, L"shell\\open\\command", command);
+
+	_r_obj_dereference (subkey);
+
+	return is_success;
+}
+
 static PR_STRING _app_insert_profile_dir_in_command (
 	_In_ PR_STRING command,
 	_In_ PR_STRING profile_dir
@@ -100,22 +126,97 @@ static PR_STRING _app_insert_profile_dir_in_command (
 {
 	static const WCHAR SINGLE_ARGUMENT[] = L"--single-argument";
 	static const WCHAR USER_DATA_DIR[] = L"--user-data-dir";
+	static const WCHAR URL_TOKEN[] = L"-- \"%1";
 
 	PR_STRING profile_arg;
 	PR_STRING result;
+	LPCWSTR existing_ptr;
+	LPCWSTR replace_start;
+	LPCWSTR replace_end;
+	LPCWSTR suffix_ptr;
 	LPCWSTR insert_pos;
+	LPCWSTR url_pos;
+	LPCWSTR command_end;
 	SIZE_T prefix_len;
 	SIZE_T suffix_len;
 	SIZE_T result_len;
-
-	// check if --user-data-dir is already present
-	if (StrStrIW (command->buffer, USER_DATA_DIR))
-		return NULL; // already patched
+	BOOLEAN is_quote = FALSE;
 
 	profile_arg = _r_format_string (L"--user-data-dir=\"%s\"", profile_dir->buffer);
 
 	if (!profile_arg)
 		return NULL;
+
+	existing_ptr = StrStrIW (command->buffer, USER_DATA_DIR);
+
+	if (existing_ptr)
+	{
+		replace_start = existing_ptr;
+		command_end = command->buffer + (command->length / sizeof (WCHAR));
+
+		if (replace_start > command->buffer && *(replace_start - 1) == L' ')
+			replace_start--;
+
+		replace_end = existing_ptr;
+
+		while (replace_end < command_end && *replace_end)
+		{
+			if (*replace_end == L'"')
+				is_quote = !is_quote;
+
+			if (!is_quote && (*replace_end == L' ' || *replace_end == L'\t'))
+				break;
+
+			replace_end++;
+		}
+
+		suffix_ptr = replace_end;
+
+		while (*suffix_ptr == L' ' || *suffix_ptr == L'\t')
+			suffix_ptr++;
+
+		prefix_len = (SIZE_T)(replace_start - command->buffer) * sizeof (WCHAR);
+		suffix_len = (SIZE_T)(command_end - suffix_ptr) * sizeof (WCHAR);
+
+		result_len = prefix_len +
+			(prefix_len ? sizeof (WCHAR) : 0) +
+			(SIZE_T)profile_arg->length +
+			(suffix_len ? sizeof (WCHAR) : 0) +
+			suffix_len;
+
+		result = _r_obj_createstring_ex (NULL, result_len);
+
+		if (result)
+		{
+			SIZE_T offset = 0;
+
+			if (prefix_len)
+			{
+				RtlCopyMemory (result->buffer, command->buffer, prefix_len);
+				offset += prefix_len;
+
+				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
+				offset += sizeof (WCHAR);
+			}
+
+			RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), profile_arg->buffer, profile_arg->length);
+			offset += profile_arg->length;
+
+			if (suffix_len)
+			{
+				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
+				offset += sizeof (WCHAR);
+
+				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), suffix_ptr, suffix_len);
+			}
+
+			_r_str_trimtonullterminator (&result->sr);
+		}
+
+		_r_obj_dereference (profile_arg);
+
+		return result;
+	}
 
 	// find --single-argument to insert before it
 	insert_pos = StrStrIW (command->buffer, SINGLE_ARGUMENT);
@@ -161,8 +262,7 @@ static PR_STRING _app_insert_profile_dir_in_command (
 	else
 	{
 		// no --single-argument found; insert before -- "%1" or at end
-		static const WCHAR URL_TOKEN[] = L"-- \"%1";
-		LPCWSTR url_pos = StrStrIW (command->buffer, URL_TOKEN);
+		url_pos = StrStrIW (command->buffer, URL_TOKEN);
 
 		if (url_pos)
 		{
@@ -223,6 +323,64 @@ static PR_STRING _app_insert_profile_dir_in_command (
 	return result;
 }
 
+static BOOLEAN _app_command_has_profile_dir (
+	_In_ PR_STRING command,
+	_In_ PR_STRING profile_dir
+)
+{
+	PR_STRING profile_arg;
+	BOOLEAN is_match;
+
+	if (!command || _r_obj_isstringempty (command) || !profile_dir || _r_obj_isstringempty (profile_dir))
+		return FALSE;
+
+	profile_arg = _r_format_string (L"--user-data-dir=\"%s\"", profile_dir->buffer);
+
+	if (!profile_arg)
+		return FALSE;
+
+	is_match = (StrStrIW (command->buffer, profile_arg->buffer) != NULL);
+
+	_r_obj_dereference (profile_arg);
+
+	return is_match;
+}
+
+static BOOLEAN _app_is_protocol_registry_patched (
+	_In_ LPCWSTR protocol,
+	_In_ PR_STRING profile_dir
+)
+{
+	PR_STRING assoc_subkey;
+	PR_STRING prog_id = NULL;
+	PR_STRING command = NULL;
+	BOOLEAN is_patched = FALSE;
+
+	assoc_subkey = _r_format_string (
+		L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\%s\\UserChoice",
+		protocol
+	);
+
+	if (!assoc_subkey)
+		return FALSE;
+
+	if (_app_reg_read_string (HKEY_CURRENT_USER, assoc_subkey->buffer, L"ProgId", &prog_id) &&
+		_app_reg_read_open_command (prog_id, &command))
+	{
+		is_patched = _app_command_has_profile_dir (command, profile_dir);
+	}
+
+	if (command)
+		_r_obj_dereference (command);
+
+	if (prog_id)
+		_r_obj_dereference (prog_id);
+
+	_r_obj_dereference (assoc_subkey);
+
+	return is_patched;
+}
+
 BOOLEAN _app_patch_registry_profile (
 	_In_ PBROWSER_INFORMATION pbi
 )
@@ -240,14 +398,10 @@ BOOLEAN _app_patch_registry_profile (
 		return FALSE;
 
 	// read open command from the ProgId
-	if (!_app_reg_read_string (HKEY_CLASSES_ROOT, prog_id->buffer, L"shell\\open\\command", &command))
+	if (!_app_reg_read_open_command (prog_id, &command))
 	{
-		// try HKCU\Software\Classes as fallback
-		if (!_app_reg_read_string (HKEY_CURRENT_USER, prog_id->buffer, L"shell\\open\\command", &command))
-		{
-			_r_obj_dereference (prog_id);
-			return FALSE;
-		}
+		_r_obj_dereference (prog_id);
+		return FALSE;
 	}
 
 	// insert profile dir
@@ -284,7 +438,7 @@ BOOLEAN _app_patch_registry_profile (
 		if (_app_reg_read_string (HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice", L"ProgId", &https_prog_id))
 		{
 			// only patch if different ProgId or same
-			if (_app_reg_read_string (HKEY_CLASSES_ROOT, https_prog_id->buffer, L"shell\\open\\command", &https_command))
+			if (_app_reg_read_open_command (https_prog_id, &https_command))
 			{
 				https_new_command = _app_insert_profile_dir_in_command (https_command, pbi->profile_dir);
 
@@ -321,33 +475,11 @@ BOOLEAN _app_is_registry_patched (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {
-	PR_STRING prog_id = NULL;
-	PR_STRING command = NULL;
-	BOOLEAN is_patched = FALSE;
-
 	if (!pbi || _r_obj_isstringempty (pbi->profile_dir))
 		return FALSE;
 
-	if (!_app_reg_read_string (HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice", L"ProgId", &prog_id))
+	if (!_app_is_protocol_registry_patched (L"http", pbi->profile_dir))
 		return FALSE;
 
-	if (_app_reg_read_string (HKEY_CLASSES_ROOT, prog_id->buffer, L"shell\\open\\command", &command))
-	{
-		is_patched = (StrStrIW (command->buffer, L"--user-data-dir") != NULL);
-		_r_obj_dereference (command);
-	}
-
-	if (!is_patched)
-	{
-		if (_app_reg_read_string (HKEY_CURRENT_USER, prog_id->buffer, L"shell\\open\\command", &command))
-		{
-			is_patched = (StrStrIW (command->buffer, L"--user-data-dir") != NULL);
-			_r_obj_dereference (command);
-		}
-	}
-
-	_r_obj_dereference (prog_id);
-
-	return is_patched;
+	return _app_is_protocol_registry_patched (L"https", pbi->profile_dir);
 }
-
