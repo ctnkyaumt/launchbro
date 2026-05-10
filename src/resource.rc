@@ -29,6 +29,13 @@ BEGIN
 		MENUITEM " ", IDM_RUN
 		MENUITEM " ", IDM_OPEN
 		MENUITEM SEPARATOR
+		MENUITEM " ", IDM_CHECKFORUPDATES
+		MENUITEM SEPARATOR
+		MENUITEM " ", IDM_EXPORTPROFILE
+		MENUITEM " ", IDM_IMPORTPROFILE
+		MENUITEM SEPARATOR
+		MENUITEM " ", IDM_UNINSTALL
+		MENUITEM SEPARATOR
 		MENUITEM " ", IDM_EXIT
 	END
 	POPUP " "
@@ -141,6 +148,26 @@ BEGIN
 	IDS_STATUS_RESTARTNOTICE "Chromium will be restarted to apply the update."
 	IDS_STATUS_RETRYINSTALL "Update downloaded, but Chromium is still running. Will retry later."
 	IDS_QUESTION_TASKENABLE "Create a scheduled task that checks for updates every 14 days and may restart running Chromium to apply updates?"
+
+	IDS_CHECKFORUPDATES "Check for updates"
+	IDS_AUTOCHECKUPDATES_CHK "Auto-check for updates on launch"
+	IDS_UNINSTALL "Uninstall"
+	IDS_EXPORTPROFILE "Export profile"
+	IDS_IMPORTPROFILE "Import profile"
+	IDS_UPDATE_AVAILABLE "New version %s is available. Download and install now?"
+	IDS_UPDATE_DOWNLOADING "Downloading app update..."
+	IDS_UPDATE_INSTALLING "Installing app update..."
+	IDS_UPDATE_DONE "Update installed successfully. Restarting..."
+	IDS_UPDATE_ERROR "Error updating the application."
+	IDS_UPDATE_UPTODATE "You are using the latest version."
+	IDS_MIGRATION_FOUND "An existing chrlauncher installation was found. Do you want to migrate data and rename it to launchbro?"
+	IDS_MIGRATION_TITLE "Migration detected"
+	IDS_UNINSTALL_CONFIRM "Are you sure you want to uninstall launchbro?"
+	IDS_UNINSTALL_KEEPPROFILES "Do you want to keep your browser profiles?"
+	IDS_EXPORTPROFILE_TITLE "Choose a folder to export profiles to"
+	IDS_IMPORTPROFILE_TITLE "Choose a profile folder to import"
+	IDS_PROFILE_EXPORTED "Profile exported successfully."
+	IDS_PROFILE_IMPORTED "Profile imported successfully."
 END
 
 //
@@ -185,3 +212,4 @@ BEGIN
 		VALUE "Translation", 0x0409, 1252
 	END
 END
+

@@ -288,3 +288,4 @@ SRes Bcj2Dec_Decode(CBcj2Dec *p)
 #undef kNumBitModelTotalBits
 #undef kBitModelTotal
 #undef kNumMoveBits
+

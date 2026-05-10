@@ -60,3 +60,4 @@ SRes Xz_EncodeEmpty(ISeqOutStreamPtr outStream);
 EXTERN_C_END
 
 #endif
+

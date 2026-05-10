@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -83,11 +83,6 @@ VOID _app_taskupdate_closebrowser (
 	_In_ PBROWSER_INFORMATION pbi,
 	_Out_ PBOOLEAN was_running_ptr
 );
-
-BOOLEAN _app_taskupdate_istaskpresent ();
-BOOLEAN _app_taskupdate_setstartwhenavailable ();
-BOOLEAN _app_taskupdate_createtask ();
-BOOLEAN _app_taskupdate_deletetask ();
 
 VOID _app_update_browser_info (
 	_In_ HWND hwnd,
@@ -590,6 +585,7 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_checkitem (hmenu, IDM_RUNATEND_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"ChromiumRunAtEnd", TRUE));
 				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
 				_r_menu_checkitem (hmenu, IDM_TASKUPDATE_CHK, 0, MF_BYCOMMAND, is_taskenabled);
+				_r_menu_checkitem (hmenu, IDM_AUTOCHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AutoCheckUpdates", TRUE));
 			}
 
 			_r_taskbar_initialize (&browser_info.htaskbar);
@@ -635,6 +631,11 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_setitemtext (hmenu, IDM_RUNATEND_CHK, FALSE, _r_locale_getstring (IDS_RUNATEND_CHK));
 				_r_menu_setitemtext (hmenu, IDM_DARKMODE_CHK, FALSE, _r_locale_getstring (IDS_DARKMODE_CHK));
 				_r_menu_setitemtext (hmenu, IDM_TASKUPDATE_CHK, FALSE, _r_locale_getstring (IDS_TASKUPDATE_CHK));
+				_r_menu_setitemtext (hmenu, IDM_AUTOCHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_AUTOCHECKUPDATES_CHK));
+				_r_menu_setitemtext (hmenu, IDM_CHECKFORUPDATES, FALSE, _r_locale_getstring (IDS_CHECKFORUPDATES));
+				_r_menu_setitemtext (hmenu, IDM_EXPORTPROFILE, FALSE, _r_locale_getstring (IDS_EXPORTPROFILE));
+				_r_menu_setitemtext (hmenu, IDM_IMPORTPROFILE, FALSE, _r_locale_getstring (IDS_IMPORTPROFILE));
+				_r_menu_setitemtext (hmenu, IDM_UNINSTALL, FALSE, _r_locale_getstring (IDS_UNINSTALL));
 				_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
 				_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
 
@@ -1008,6 +1009,77 @@ INT_PTR CALLBACK DlgProc (
 					break;
 				}
 
+				case IDM_CHECKFORUPDATES:
+				{
+					PR_STRING new_version = NULL;
+					PR_STRING download_url = NULL;
+					PR_STRING zip_path = NULL;
+					PR_STRING msg = NULL;
+
+					if (_app_check_self_update (hwnd, &new_version, &download_url))
+					{
+						msg = _r_format_string (_r_locale_getstring (IDS_UPDATE_AVAILABLE), new_version->buffer);
+
+						if (msg && _r_show_message (hwnd, MB_YESNO | MB_ICONINFORMATION, NULL, msg->buffer) == IDYES)
+						{
+							if (_app_download_self_update (hwnd, download_url, &zip_path))
+							{
+								_app_apply_self_update (hwnd, zip_path);
+								_r_obj_dereference (zip_path);
+							}
+							else
+							{
+								_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, _r_locale_getstring (IDS_UPDATE_ERROR));
+							}
+						}
+
+						if (msg)
+							_r_obj_dereference (msg);
+					}
+					else
+					{
+						_r_show_message (hwnd, MB_OK | MB_ICONINFORMATION, NULL, _r_locale_getstring (IDS_UPDATE_UPTODATE));
+					}
+
+					if (new_version)
+						_r_obj_dereference (new_version);
+
+					if (download_url)
+						_r_obj_dereference (download_url);
+
+					break;
+				}
+
+				case IDM_AUTOCHECKUPDATES_CHK:
+				{
+					BOOLEAN new_val;
+
+					new_val = !_r_config_getboolean (L"AutoCheckUpdates", TRUE);
+
+					_r_menu_checkitem (GetMenu (hwnd), ctrl_id, 0, MF_BYCOMMAND, new_val);
+					_r_config_setboolean (L"AutoCheckUpdates", new_val);
+
+					break;
+				}
+
+				case IDM_EXPORTPROFILE:
+				{
+					_app_export_profile (hwnd);
+					break;
+				}
+
+				case IDM_IMPORTPROFILE:
+				{
+					_app_import_profile (hwnd);
+					break;
+				}
+
+				case IDM_UNINSTALL:
+				{
+					_app_uninstall_app (hwnd);
+					break;
+				}
+
 				case IDM_WEBSITE:
 				case IDM_TRAY_WEBSITE:
 				{
@@ -1032,8 +1104,43 @@ INT_PTR CALLBACK DlgProc (
 			break;
 		}
 	}
-
 	return FALSE;
+}
+
+static VOID _app_auto_check_updates (
+	_In_ HWND hwnd
+)
+{
+	PR_STRING new_version = NULL;
+	PR_STRING download_url = NULL;
+	PR_STRING zip_path = NULL;
+	PR_STRING msg = NULL;
+
+	if (!_r_config_getboolean (L"AutoCheckUpdates", TRUE))
+		return;
+
+	if (_app_check_self_update (hwnd, &new_version, &download_url))
+	{
+		msg = _r_format_string (_r_locale_getstring (IDS_UPDATE_AVAILABLE), new_version->buffer);
+
+		if (msg && _r_show_message (hwnd, MB_YESNO | MB_ICONINFORMATION, NULL, msg->buffer) == IDYES)
+		{
+			if (_app_download_self_update (hwnd, download_url, &zip_path))
+			{
+				_app_apply_self_update (hwnd, zip_path);
+				_r_obj_dereference (zip_path);
+			}
+		}
+
+		if (msg)
+			_r_obj_dereference (msg);
+	}
+
+	if (new_version)
+		_r_obj_dereference (new_version);
+
+	if (download_url)
+		_r_obj_dereference (download_url);
 }
 
 INT APIENTRY wWinMain (
@@ -1072,5 +1179,19 @@ INT APIENTRY wWinMain (
 	if (!hwnd)
 		return ERROR_APP_INIT_FAILURE;
 
+	// Check for chrlauncher migration
+	if (_app_check_migration ())
+	{
+		if (_r_show_message (hwnd, MB_YESNO | MB_ICONQUESTION, _r_locale_getstring (IDS_MIGRATION_TITLE), _r_locale_getstring (IDS_MIGRATION_FOUND)) == IDYES)
+		{
+			_app_perform_migration (hwnd);
+			return ERROR_SUCCESS;
+		}
+	}
+
+	// Auto-check for app updates
+	_app_auto_check_updates (hwnd);
+
 	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCE (IDA_MAIN));
 }
+

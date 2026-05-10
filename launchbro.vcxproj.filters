@@ -51,6 +51,12 @@
     <ClCompile Include="src\registry.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\self_update.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\profile_mgmt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\routine\src\rapp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -351,3 +357,4 @@
     </ResourceCompile>
   </ItemGroup>
 </Project>
+

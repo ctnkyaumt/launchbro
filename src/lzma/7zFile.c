@@ -441,3 +441,4 @@ void FileOutStream_CreateVTable(CFileOutStream *p)
 {
   p->vt.Write = FileOutStream_Write;
 }
+

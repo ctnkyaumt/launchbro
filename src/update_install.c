@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -474,3 +474,4 @@ BOOLEAN _app_installupdate (
 
 	return (status == SZ_OK) ? TRUE : FALSE;
 }
+

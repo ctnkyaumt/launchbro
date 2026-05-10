@@ -540,3 +540,4 @@ SRes XzDecMt_Decode(CXzDecMtHandle p,
 EXTERN_C_END
 
 #endif
+

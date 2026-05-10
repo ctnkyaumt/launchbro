@@ -504,3 +504,4 @@ void Bcj2Enc_Encode(CBcj2Enc *p)
 #undef kNumBitModelTotalBits
 #undef kBitModelTotal
 #undef kNumMoveBits
+

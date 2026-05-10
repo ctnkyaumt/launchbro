@@ -79,3 +79,4 @@ SRes Lzma2DecMt_Read(CLzma2DecMtHandle pp,
 EXTERN_C_END
 
 #endif
+

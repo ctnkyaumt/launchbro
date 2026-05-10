@@ -74,3 +74,4 @@ void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p);
 EXTERN_C_END
 
 #endif
+

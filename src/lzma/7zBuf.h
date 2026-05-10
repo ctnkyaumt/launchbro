@@ -33,3 +33,4 @@ void DynBuf_Free(CDynBuf *p, ISzAllocPtr alloc);
 EXTERN_C_END
 
 #endif
+

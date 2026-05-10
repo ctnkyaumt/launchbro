@@ -805,3 +805,4 @@ SRes Lzma2Enc_Encode2(CLzma2EncHandle p,
 }
 
 #undef PRF
+

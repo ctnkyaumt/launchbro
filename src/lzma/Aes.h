@@ -58,3 +58,4 @@ Z7_DECLARE_AES_CODE_FUNC (AesCtr_Code_HW_256)
 EXTERN_C_END
 
 #endif
+

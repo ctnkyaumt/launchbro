@@ -200,3 +200,4 @@ const Byte *MtDec_Read(CMtDec *p, size_t *inLim);
 EXTERN_C_END
 
 #endif
+

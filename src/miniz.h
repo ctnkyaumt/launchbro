@@ -1368,3 +1368,4 @@ MINIZ_EXPORT void *mz_zip_extract_archive_file_to_heap_v2(const char *pZip_filen
 #endif
 
 #endif /* MINIZ_NO_ARCHIVE_APIS */
+

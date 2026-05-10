@@ -258,3 +258,4 @@ WRes AutoResetEvent_OptCreate_And_Reset(CAutoResetEvent *p);
 EXTERN_C_END
 
 #endif
+

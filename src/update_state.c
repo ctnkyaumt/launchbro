@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -87,3 +87,4 @@ ULONG _app_getactionid (
 
 	return IDS_ACTION_CHECK;
 }
+

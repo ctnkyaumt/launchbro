@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -295,3 +295,4 @@ VOID _app_thread_taskupdate_all (
 	_r_queuedlock_releaseshared (&lock_thread);
 	_r_wnd_sendmessage (hwnd, 0, WM_DESTROY, 0, 0);
 }
+

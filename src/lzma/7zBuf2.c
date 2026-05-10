@@ -50,3 +50,4 @@ void DynBuf_Free(CDynBuf *p, ISzAllocPtr alloc)
   p->size = 0;
   p->pos = 0;
 }
+

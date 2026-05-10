@@ -1744,3 +1744,4 @@ void LzFindPrepare(void)
 #undef MOVE_POS
 #undef MOVE_POS_RET
 #undef PRF
+

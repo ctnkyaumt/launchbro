@@ -56,3 +56,4 @@ SRes Lzma2Enc_Encode2(CLzma2EncHandle p,
 EXTERN_C_END
 
 #endif
+

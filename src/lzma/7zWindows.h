@@ -105,3 +105,4 @@ typedef ULONG_PTR DWORD_PTR, *PDWORD_PTR;
 /* #include "7zTypes.h" */
 
 #endif
+

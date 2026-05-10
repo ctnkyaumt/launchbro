@@ -602,3 +602,4 @@ SRes MtCoder_Code(CMtCoder *p)
 #endif
 
 #undef RINOK_THREAD
+

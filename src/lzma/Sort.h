@@ -13,3 +13,4 @@ void Z7_FASTCALL HeapSort(UInt32 *p, size_t size);
 EXTERN_C_END
 
 #endif
+

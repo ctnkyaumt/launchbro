@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -850,3 +850,4 @@ BOOLEAN _app_is_firefox_fork (
 
 	return _r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) || _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE);
 }
+

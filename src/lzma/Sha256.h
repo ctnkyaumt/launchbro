@@ -84,3 +84,4 @@ void Sha256Prepare(void);
 EXTERN_C_END
 
 #endif
+

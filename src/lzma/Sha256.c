@@ -490,3 +490,4 @@ void Sha256Prepare(void)
 #undef Z7_SHA256_BIG_W
 #undef Z7_SHA256_UNROLL
 #undef Z7_COMPILER_SHA256_SUPPORTED
+

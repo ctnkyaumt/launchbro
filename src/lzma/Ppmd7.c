@@ -1129,3 +1129,4 @@ we have two ways to resolve that problem:
 #undef MEM_12_CPY
 #undef SUCCESSOR
 #undef SWAP_STATES
+

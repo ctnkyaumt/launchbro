@@ -90,3 +90,4 @@ int XzCheck_Final(CXzCheck *p, Byte *digest)
   }
   return 1;
 }
+

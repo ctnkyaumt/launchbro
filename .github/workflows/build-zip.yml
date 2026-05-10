@@ -12,12 +12,15 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Fetch routine dependency
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           if (!(Test-Path ..\routine)) {
-            git clone --depth 1 https://github.com/henrypp/routine.git ..\routine
+            git clone --depth 1 https://github.com/ctnkyaumt/routine.git ..\routine
           }
 
       - name: Build Release x64
@@ -49,8 +52,26 @@ jobs:
             }
           }
 
+          # Copy supporting files
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.ini') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.lng') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\History.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\License.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\Readme.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\RegistryCleaner.reg') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\SetDefaultBrowser.bat') -Destination .\dist\launchbro\ | Out-Null
+          xcopy /E /I /Y (Join-Path $PWD 'bin\i18n') .\dist\launchbro\i18n | Out-Null
+
           if (!(Test-Path .\dist\launchbro\64\launchbro.exe) -and !(Test-Path .\dist\launchbro\32\launchbro.exe)) {
             throw "No packaged outputs were found (expected dist\\launchbro\\{32,64}\\launchbro.exe)"
+          }
+
+          # Build NSIS installer
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsis) {
+            & $nsis /V3 "installer.nsi"
+          } else {
+            Write-Warning "NSIS not found, skipping installer build"
           }
 
           Compress-Archive -Force -Path .\dist\launchbro -DestinationPath .\launchbro-bin.zip
@@ -59,3 +80,10 @@ jobs:
         with:
           name: launchbro-bin.zip
           path: launchbro-bin.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launchbro-setup.exe
+          path: launchbro-setup.exe
+

@@ -266,3 +266,4 @@ void Z7_FASTCALL HeapSort(UInt32 *p, size_t size)
     p[k ^ 1] = a2;
   }
 }
+

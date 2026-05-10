@@ -707,3 +707,4 @@ Byte * Z7_BRANCH_CONV_DEC(RISCV)(Byte *p, SizeT size, UInt32 pc)
     }
   } // for
 }
+

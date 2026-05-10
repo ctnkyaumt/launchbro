@@ -310,3 +310,4 @@ Byte *Ppmd7z_DecodeSymbols(CPpmd7 *p, Byte *buf, const Byte *lim)
 #undef CTX
 #undef SUCCESSOR
 #undef MASK
+

@@ -34,3 +34,4 @@ void Buf_Free(CBuf *p, ISzAllocPtr alloc)
   p->data = 0;
   p->size = 0;
 }
+

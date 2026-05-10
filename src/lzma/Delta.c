@@ -167,3 +167,4 @@ void Delta_Decode(Byte *state, unsigned delta, Byte *data, SizeT size)
     *state++ = *data;
   while (++data != lim);
 }
+

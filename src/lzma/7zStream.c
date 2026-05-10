@@ -197,3 +197,4 @@ void SecToRead_CreateVTable(CSecToRead *p)
 {
   p->vt.Read = SecToRead_Read;
 }
+

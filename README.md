@@ -25,7 +25,7 @@ Small and very fast portable launcher and updater for Chromium.
 ### GPG Signature:
 Binaries have GPG signature `launchbro.exe.sig` in application folder.
 
-- Public key: [pubkey.asc](https://raw.githubusercontent.com/henrypp/builder/master/pubkey.asc) ([pgpkeys.eu](https://pgpkeys.eu/pks/lookup?op=index&fingerprint=on&search=0x5635B5FD))
+- Public key: [pubkey.asc](https://raw.githubusercontent.com/ctnkyaumt/builder/master/pubkey.asc) ([pgpkeys.eu](https://pgpkeys.eu/pks/lookup?op=index&fingerprint=on&search=0x5635B5FD))
 - Key ID: 0x5635B5FD
 - Fingerprint: D985 2361 1524 AB29 BE73 30AC 2881 20A7 5635 B5FD
 
@@ -182,14 +182,3 @@ ChromiumDeleteToRecycle=true
 # Set proxy configuration (string):
 #Proxy=127.0.0.1:80
 ~~~
-### FAQ:
-- [If you lost all setting and extensions when copy Chromium to another PC (answer)](https://github.com/henrypp/launchbro/issues/116#issuecomment-444426692)
-- [How to force check for an update every launchbro start?](https://github.com/henrypp/launchbro/issues/92#issuecomment-343274418)
-- [How to host the Chromium package zip on custom network?](https://github.com/henrypp/launchbro/issues/86)
-- [Can't sign-in to Chromium](https://github.com/henrypp/launchbro/issues/115#issuecomment-444268533)
-- [Set proxy configuration for a launchbro](https://github.com/henrypp/launchbro/issues/61#issuecomment-439295515)
-- [Pass on launchbro arguments into Chromium](https://github.com/henrypp/launchbro/issues/76#issuecomment-312444105)
-- [Disable annoying launchbro window popup](https://github.com/henrypp/launchbro/issues/96#issuecomment-439294915)
-- [Is it possible to downgrade Chromium version?](https://github.com/henrypp/launchbro/issues/112#issuecomment-440940865)
-- [Fix for duplicated taskbar icons creation](https://github.com/henrypp/launchbro/issues/49#issuecomment-289285155)
-

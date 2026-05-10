@@ -1420,3 +1420,4 @@ void MatchFinderMt_CreateVTable(CMatchFinderMt *p, IMatchFinder2 *vTable)
 #undef GetUi24hi_from32
 #undef LOCK_BUFFER
 #undef UNLOCK_BUFFER
+

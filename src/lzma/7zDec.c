@@ -671,3 +671,4 @@ SRes SzAr_DecodeFolder(const CSzAr *p, UInt32 folderIndex,
     return res;
   }
 }
+

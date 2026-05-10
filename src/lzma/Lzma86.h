@@ -109,3 +109,4 @@ SRes Lzma86_Decode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen);
 EXTERN_C_END
 
 #endif
+

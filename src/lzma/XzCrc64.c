@@ -138,3 +138,4 @@ void Z7_FASTCALL Crc64GenerateTable(void)
 #undef FUNC_NAME_BE_2
 #undef FUNC_NAME_BE_1
 #undef FUNC_NAME_BE
+

@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -126,3 +126,4 @@ VOID _app_openbrowser (
 	_r_obj_dereference (args_string);
 	_r_obj_dereference (cmdline);
 }
+

@@ -810,3 +810,4 @@ UInt32 ThreadNextGroup_GetNext(CThreadNextGroup *p)
 
 #undef PRF
 #undef Print
+

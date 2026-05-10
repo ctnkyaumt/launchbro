@@ -491,3 +491,4 @@ SRes Lzma2Decode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen,
 }
 
 #undef PRF
+

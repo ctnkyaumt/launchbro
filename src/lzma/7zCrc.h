@@ -26,3 +26,4 @@ Z7_CRC_UPDATE_FUNC z7_GetFunc_CrcUpdate(unsigned algo);
 EXTERN_C_END
 
 #endif
+

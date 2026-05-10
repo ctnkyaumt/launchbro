@@ -112,3 +112,4 @@ void MatchFinderMt_ReleaseStream(CMatchFinderMt *p);
 EXTERN_C_END
 
 #endif
+

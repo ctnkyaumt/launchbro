@@ -90,3 +90,4 @@ void FileOutStream_CreateVTable(CFileOutStream *p);
 EXTERN_C_END
 
 #endif
+

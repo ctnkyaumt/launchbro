@@ -51,3 +51,4 @@ SRes Lzma86_Decode(Byte *dest, SizeT *destLen, const Byte *src, SizeT *srcLen)
   }
   return SZ_OK;
 }
+

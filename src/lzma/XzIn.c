@@ -383,3 +383,4 @@ SRes Xzs_ReadBackward(CXzs *p, ILookInStreamPtr stream, Int64 *startOffset, ICom
       return SZ_ERROR_PROGRESS;
   }
 }
+

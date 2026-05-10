@@ -32,3 +32,4 @@
 #define kLzHash_CrcShift_2 10
 
 #endif
+

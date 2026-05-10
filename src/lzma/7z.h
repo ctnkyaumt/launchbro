@@ -202,3 +202,4 @@ SRes SzArEx_Open(CSzArEx *p, ILookInStreamPtr inStream,
 EXTERN_C_END
 
 #endif
+

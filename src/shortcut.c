@@ -1,5 +1,5 @@
 // launchbro
-// Copyright (c) 2015-2025 Henry++
+// 2026 ctnkyaumt
 
 #include "routine.h"
 
@@ -140,3 +140,4 @@ VOID _app_create_profileshortcut (
 	_r_obj_dereference (link_title);
 	_r_obj_dereference (link_path);
 }
+

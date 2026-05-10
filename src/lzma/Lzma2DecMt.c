@@ -1093,3 +1093,4 @@ SRes Lzma2DecMt_Read(CLzma2DecMtHandle p,
 #undef PRF
 #undef PRF_STR
 #undef PRF_STR_INT_2
+

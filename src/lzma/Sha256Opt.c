@@ -449,3 +449,4 @@ void Z7_FASTCALL Sha256_UpdateBlocks_HW(UInt32 state[8], const Byte *data, size_
 #undef ATTRIB_SHA
 #undef USE_VER_MIN
 #undef Z7_USE_HW_SHA_STUB
+

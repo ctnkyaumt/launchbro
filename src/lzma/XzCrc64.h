@@ -24,3 +24,4 @@ UInt64 Z7_FASTCALL Crc64Update(UInt64 crc, const void *data, size_t size);
 EXTERN_C_END
 
 #endif
+

@@ -101,3 +101,4 @@ int Lzma86_Encode(Byte *dest, size_t *destLen, const Byte *src, size_t srcLen,
     MyFree(filteredStream);
   return mainResult;
 }
+

@@ -40,3 +40,4 @@ Z7_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned ch
   ELzmaStatus status;
   return LzmaDecode(dest, destLen, src, srcLen, props, (unsigned)propsSize, LZMA_FINISH_ANY, &status, &g_Alloc);
 }
+

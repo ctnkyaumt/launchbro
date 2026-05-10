@@ -179,3 +179,4 @@ void Ppmd7z_EncodeSymbols(CPpmd7 *p, const Byte *buf, const Byte *lim);
 EXTERN_C_END
  
 #endif
+

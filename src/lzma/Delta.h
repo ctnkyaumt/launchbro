@@ -17,3 +17,4 @@ void Delta_Decode(Byte *state, unsigned delta, Byte *data, SizeT size);
 EXTERN_C_END
 
 #endif
+

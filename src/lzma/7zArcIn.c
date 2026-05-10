@@ -1784,3 +1784,4 @@ UInt16 *SzArEx_GetFullNameUtf16_Back(const CSzArEx *p, size_t fileIndex, UInt16 
   }
 }
 */
+

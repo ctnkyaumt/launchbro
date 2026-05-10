@@ -468,6 +468,8 @@ xcopy /E /I /Y "$(SolutionDir)bin\i18n" "$(OutDir)i18n" &gt;nul</Command>
     <ClCompile Include="src\update_state.c" />
     <ClCompile Include="src\browser_info.c" />
     <ClCompile Include="src\registry.c" />
+    <ClCompile Include="src\self_update.c" />
+    <ClCompile Include="src\profile_mgmt.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\routine\src\ntapi.h" />
@@ -526,3 +528,4 @@ xcopy /E /I /Y "$(SolutionDir)bin\i18n" "$(OutDir)i18n" &gt;nul</Command>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+

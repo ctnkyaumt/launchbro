@@ -603,3 +603,4 @@ void AlignOffsetAlloc_CreateVTable(CAlignOffsetAlloc *p)
   p->vt.Alloc = AlignOffsetAlloc_Alloc;
   p->vt.Free = AlignOffsetAlloc_Free;
 }
+

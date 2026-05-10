@@ -17,3 +17,4 @@ void SzFreeTemp(ISzAllocPtr p, void *address);
 EXTERN_C_END
 
 #endif
+

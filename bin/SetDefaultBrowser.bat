@@ -78,3 +78,4 @@ if not exist "%LAUNCHBRO_PATH%" (
 )
 
 pause
+

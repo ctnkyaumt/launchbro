@@ -335,3 +335,4 @@ void Ppmd7z_EncodeSymbols(CPpmd7 *p, const Byte *buf, const Byte *lim)
 #undef CTX
 #undef SUCCESSOR
 #undef MASK
+

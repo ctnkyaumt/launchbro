@@ -1372,3 +1372,4 @@ SRes Xz_EncodeEmpty(ISeqOutStreamPtr outStream)
   XzEncIndex_Free(&xzIndex, NULL); // g_Alloc
   return res;
 }
+

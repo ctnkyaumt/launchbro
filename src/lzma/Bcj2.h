@@ -330,3 +330,4 @@ void Bcj2Enc_Encode(CBcj2Enc *p);
 EXTERN_C_END
 
 #endif
+

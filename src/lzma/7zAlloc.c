@@ -87,3 +87,4 @@ void SzFreeTemp(ISzAllocPtr p, void *address)
   #endif
   free(address);
 }
+

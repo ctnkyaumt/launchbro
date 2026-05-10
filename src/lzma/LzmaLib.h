@@ -136,3 +136,4 @@ Z7_STDAPI LzmaUncompress(unsigned char *dest, size_t *destLen, const unsigned ch
 EXTERN_C_END
 
 #endif
+

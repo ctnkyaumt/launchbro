@@ -418,3 +418,4 @@ Z7_CRC_UPDATE_FUNC z7_GetFunc_CrcUpdate(unsigned algo)
 #undef CRC_HW_UNROLL_BYTES
 #undef CRC_HW_WORD_FUNC
 #undef CRC_HW_WORD_TYPE
+

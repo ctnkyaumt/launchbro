@@ -167,3 +167,4 @@ typedef Ppmd_Ref_Type(Byte)        CPpmd_Byte_Ref;
 EXTERN_C_END
  
 #endif
+
