@@ -16,7 +16,7 @@
 -------
 
 <p align="center">
-	<img src="/images/launchbro.png?hgcv" />
+	<img src="/images/launchbrov.gif" />
 </p>
 
 ### Description:
