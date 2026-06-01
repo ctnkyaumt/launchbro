@@ -485,6 +485,10 @@ BOOLEAN _app_ensure_registry_profile (
 	if (_app_is_registry_patched (pbi))
 		return TRUE;
 
+	// if the default browser command already exists, patch it directly first
+	if (_app_patch_registry_profile (pbi))
+		return TRUE;
+
 	// registry keys don't exist yet - browser needs to run once to register itself
 	// prompt user before doing this
 	if (_r_show_message (hwnd, MB_YESNO | MB_ICONQUESTION, NULL,
