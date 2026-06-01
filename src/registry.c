@@ -431,14 +431,8 @@ BOOLEAN _app_patch_registry_profile (
 			goto CleanupHttps;
 		}
 
-		// write back - try HKCR first, then HKCU\Software\Classes
-		if (_app_reg_write_string (HKEY_CLASSES_ROOT, open_command_subkey->buffer, NULL, new_command->buffer))
+		// Prefer the per-user Classes override because UserChoice defaults are per-user too.
 		{
-			is_success = TRUE;
-		}
-		else
-		{
-			// fallback to HKCU
 			PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", open_command_subkey->buffer);
 
 			if (subkey)
@@ -446,6 +440,12 @@ BOOLEAN _app_patch_registry_profile (
 				is_success = _app_reg_write_string (HKEY_CURRENT_USER, subkey->buffer, NULL, new_command->buffer);
 				_r_obj_dereference (subkey);
 			}
+		}
+
+		// Fallback to HKCR only if the user-level write did not succeed.
+		if (!is_success && _app_reg_write_string (HKEY_CLASSES_ROOT, open_command_subkey->buffer, NULL, new_command->buffer))
+		{
+			is_success = TRUE;
 		}
 
 		_r_obj_dereference (open_command_subkey);
@@ -469,6 +469,7 @@ CleanupHttps:
 				if (https_new_command)
 				{
 					PR_STRING https_open_command_subkey = _r_format_string (L"%s\\shell\\open\\command", https_prog_id->buffer);
+					BOOLEAN https_is_success = FALSE;
 
 					if (!https_open_command_subkey)
 					{
@@ -478,16 +479,23 @@ CleanupHttps:
 						goto Cleanup;
 					}
 
-					if (!_app_reg_write_string (HKEY_CLASSES_ROOT, https_open_command_subkey->buffer, NULL, https_new_command->buffer))
 					{
 						PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", https_open_command_subkey->buffer);
 
 						if (subkey)
 						{
-							_app_reg_write_string (HKEY_CURRENT_USER, subkey->buffer, NULL, https_new_command->buffer);
+							https_is_success = _app_reg_write_string (HKEY_CURRENT_USER, subkey->buffer, NULL, https_new_command->buffer);
 							_r_obj_dereference (subkey);
 						}
 					}
+
+					if (!https_is_success)
+					{
+						https_is_success = _app_reg_write_string (HKEY_CLASSES_ROOT, https_open_command_subkey->buffer, NULL, https_new_command->buffer);
+					}
+
+					if (!is_success && https_is_success)
+						is_success = TRUE;
 
 					_r_obj_dereference (https_open_command_subkey);
 					_r_obj_dereference (https_new_command);
