@@ -8,8 +8,6 @@
 
 #include <shlobj.h>
 #include <shobjidl.h>
-#include <propsys.h>
-#include <propkey.h>
 
 VOID _app_create_profileshortcut (
 	_In_ PBROWSER_INFORMATION pbi
@@ -18,13 +16,10 @@ VOID _app_create_profileshortcut (
 	PWSTR desktop_path = NULL;
 	PR_STRING link_title = NULL;
 	PR_STRING link_path = NULL;
-	PR_STRING app_id = NULL;
 	HRESULT hr_init;
 	HRESULT hr;
 	IShellLinkW *psl = NULL;
 	IPersistFile *ppf = NULL;
-	IPropertyStore *pps = NULL;
-	PROPVARIANT pv = {0};
 
 	if (!pbi || _r_obj_isstringempty (pbi->binary_path) || _r_obj_isstringempty (pbi->profile_dir))
 		return;
@@ -91,37 +86,6 @@ VOID _app_create_profileshortcut (
 
 		psl->lpVtbl->SetIconLocation (psl, pbi->binary_path->buffer, 0);
 		psl->lpVtbl->SetDescription (psl, link_title->buffer);
-
-		app_id = _r_format_string (
-			L"%s.%s.%" TEXT (PR_LONG) L".%" TEXT (PR_LONG),
-			_r_app_getnameshort (),
-			_r_obj_getstring (pbi->browser_type),
-			pbi->architecture,
-			(pbi->instance_id >= 1) ? pbi->instance_id : 1
-		);
-
-		if (app_id)
-		{
-			hr = psl->lpVtbl->QueryInterface (psl, &IID_IPropertyStore, (PVOID_PTR)&pps);
-
-			if (SUCCEEDED (hr) && pps)
-			{
-				pv.vt = VT_LPWSTR;
-				pv.pwszVal = CoTaskMemAlloc (app_id->length + sizeof (WCHAR));
-
-				if (pv.pwszVal)
-				{
-					RtlCopyMemory (pv.pwszVal, app_id->buffer, app_id->length + sizeof (WCHAR));
-					pps->lpVtbl->SetValue (pps, &PKEY_AppUserModel_ID, &pv);
-					pps->lpVtbl->Commit (pps);
-					PropVariantClear (&pv);
-				}
-
-				pps->lpVtbl->Release (pps);
-			}
-
-			_r_obj_dereference (app_id);
-		}
 
 		hr = psl->lpVtbl->QueryInterface (psl, &IID_IPersistFile, (PVOID_PTR)&ppf);
 

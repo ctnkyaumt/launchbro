@@ -428,6 +428,7 @@ BOOLEAN _app_installupdate (
 	PR_STRING buffer2 = NULL;
 	PR_STRING backup_dir = NULL;
 	PR_STRING staged_dir = NULL;
+	PR_STRING parent_dir = NULL;
 	BROWSER_INFORMATION install_info;
 	BOOLEAN had_existing_dir = FALSE;
 	ULONG win32_error = ERROR_SUCCESS;
@@ -469,6 +470,17 @@ BOOLEAN _app_installupdate (
 			status = (NTSTATUS)win32_error;
 			goto CleanupExit;
 		}
+	}
+
+	parent_dir = _r_path_getbasedirectory (&pbi->binary_dir->sr);
+
+	if (parent_dir)
+	{
+		if (!_r_fs_exists (&parent_dir->sr))
+			_r_fs_createdirectory (&parent_dir->sr);
+
+		_r_obj_dereference (parent_dir);
+		parent_dir = NULL;
 	}
 
 	_r_fs_createdirectory (&staged_dir->sr);
@@ -547,6 +559,9 @@ CleanupExit:
 
 	if (staged_dir)
 		_r_obj_dereference (staged_dir);
+
+	if (parent_dir)
+		_r_obj_dereference (parent_dir);
 
 	*is_error_ptr = (status != SZ_OK);
 

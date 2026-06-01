@@ -417,15 +417,16 @@ VOID _app_uninstall_app (
 )
 {
 	PR_STRING app_root;
-	PR_STRING bat_path = NULL;
-	PR_STRING bat_content = NULL;
+	PR_STRING temp_dir = NULL;
+	PR_STRING script_path = NULL;
+	PR_STRING script_params = NULL;
+	PR_STRING script_content = NULL;
 	HANDLE hfile;
 	ULONG written;
 	NTSTATUS status;
 	BOOLEAN keep_profiles = FALSE;
 	SHELLEXECUTEINFOW sei = {0};
 	INT msg_result;
-	WCHAR exe_path[4096] = {0};
 
 	msg_result = _r_show_message (hwnd, MB_YESNO | MB_ICONWARNING, NULL, _r_locale_getstring (IDS_UNINSTALL_CONFIRM));
 
@@ -442,68 +443,75 @@ VOID _app_uninstall_app (
 	if (!app_root)
 		return;
 
-	bat_path = _r_format_string (L"%s\\_launchbro_uninstall.bat", app_root->buffer);
+	temp_dir = _r_sys_gettempdirectory ();
 
-	if (!bat_path)
+	if (!temp_dir)
+		goto CleanupExit;
+
+	script_path = _r_format_string (
+		L"%s\\_launchbro_uninstall_%" TEXT (PR_ULONG) L".ps1",
+		temp_dir->buffer,
+		_r_str_gethash2 (&app_root->sr, TRUE)
+	);
+
+	if (!script_path)
 		goto CleanupExit;
 
 	if (keep_profiles)
 	{
-		bat_content = _r_format_string (
-			L"@echo off\r\n"
-			L"timeout /t 2 /nobreak >nul\r\n"
-			L"set \"ROOT=%s\"\r\n"
-			L"powershell -NoProfile -ExecutionPolicy Bypass -Command \"$roots=@($env:ROOT);$legacy=Join-Path ([System.IO.Path]::GetDirectoryName($env:ROOT)) 'chrlauncher';if(Test-Path $legacy){$roots+=$legacy};Get-CimInstance Win32_Process | Where-Object { $path=$_.ExecutablePath; $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\" >nul 2>&1\r\n"
-			L":wait_loop\r\n"
-			L"tasklist | findstr /i \"launchbro.exe\" >nul\r\n"
-			L"if %%errorlevel%% == 0 (\r\n"
-			L"  timeout /t 1 /nobreak >nul\r\n"
-			L"  goto wait_loop\r\n"
-			L")\r\n"
-			L"\r\n"
-			L"for /d %%d in (\"%%ROOT%%\\32\",\"%%ROOT%%\\64\") do (\r\n"
-			L"  if exist \"%%d\" (\r\n"
-			L"    for %%f in (\"%%d\\*.exe\",\"%%d\\*.dll\") do del /f /q \"%%f\" >nul 2>&1\r\n"
-			L"  )\r\n"
-			L")\r\n"
-			L"del /f /q \"%%ROOT%%\\*.exe\" >nul 2>&1\r\n"
-			L"del /f /q \"%%ROOT%%\\*.dll\" >nul 2>&1\r\n"
-			L"del /f /q \"%%ROOT%%\\*.bat\" >nul 2>&1\r\n"
-			L"del /f /q \"%%ROOT%%\\*.ini\" >nul 2>&1\r\n"
-			L"del /f /q \"%%ROOT%%\\*.lng\" >nul 2>&1\r\n"
-			L"del /f /q \"%%ROOT%%\\*.txt\" >nul 2>&1\r\n"
-			L"rmdir /s /q \"%%ROOT%%\\i18n\" >nul 2>&1\r\n"
-			L"del /f /q \"%s\"\r\n",
+		script_content = _r_format_string (
+			L"$Root = '%s'\r\n"
+			L"$ScriptPath = '%s'\r\n"
+			L"Start-Sleep -Seconds 2\r\n"
+			L"$roots = @($Root)\r\n"
+			L"$legacy = Join-Path ([System.IO.Path]::GetDirectoryName($Root)) 'chrlauncher'\r\n"
+			L"if (Test-Path $legacy) { $roots += $legacy }\r\n"
+			L"Get-CimInstance Win32_Process | Where-Object {\r\n"
+			L"  $path = $_.ExecutablePath\r\n"
+			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
+			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
+			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
+			L"foreach ($arch in @('32', '64')) {\r\n"
+			L"  $archRoot = Join-Path $Root $arch\r\n"
+			L"  if (!(Test-Path $archRoot)) { continue }\r\n"
+			L"  Get-ChildItem -LiteralPath $archRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'bin*' } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Get-ChildItem -LiteralPath $archRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' } | Remove-Item -Force -ErrorAction SilentlyContinue\r\n"
+			L"}\r\n"
+			L"Get-ChildItem -LiteralPath $Root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll', '.bat', '.ini', '.lng', '.txt' } | Remove-Item -Force -ErrorAction SilentlyContinue\r\n"
+			L"Remove-Item -LiteralPath (Join-Path $Root 'i18n') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"Start-Sleep -Milliseconds 500\r\n"
+			L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
 			app_root->buffer,
-			bat_path->buffer
+			script_path->buffer
 		);
 	}
 	else
 	{
-		bat_content = _r_format_string (
-			L"@echo off\r\n"
-			L"timeout /t 2 /nobreak >nul\r\n"
-			L"set \"ROOT=%s\"\r\n"
-			L"powershell -NoProfile -ExecutionPolicy Bypass -Command \"$roots=@($env:ROOT);$legacy=Join-Path ([System.IO.Path]::GetDirectoryName($env:ROOT)) 'chrlauncher';if(Test-Path $legacy){$roots+=$legacy};Get-CimInstance Win32_Process | Where-Object { $path=$_.ExecutablePath; $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\" >nul 2>&1\r\n"
-			L":wait_loop\r\n"
-			L"tasklist | findstr /i \"launchbro.exe\" >nul\r\n"
-			L"if %%errorlevel%% == 0 (\r\n"
-			L"  timeout /t 1 /nobreak >nul\r\n"
-			L"  goto wait_loop\r\n"
-			L")\r\n"
-			L"\r\n"
-			L"rmdir /s /q \"%%ROOT%%\"\r\n"
-			L"del /f /q \"%s\"\r\n",
+		script_content = _r_format_string (
+			L"$Root = '%s'\r\n"
+			L"$ScriptPath = '%s'\r\n"
+			L"Start-Sleep -Seconds 2\r\n"
+			L"$roots = @($Root)\r\n"
+			L"$legacy = Join-Path ([System.IO.Path]::GetDirectoryName($Root)) 'chrlauncher'\r\n"
+			L"if (Test-Path $legacy) { $roots += $legacy }\r\n"
+			L"Get-CimInstance Win32_Process | Where-Object {\r\n"
+			L"  $path = $_.ExecutablePath\r\n"
+			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
+			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
+			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
+			L"Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"Start-Sleep -Milliseconds 500\r\n"
+			L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
 			app_root->buffer,
-			bat_path->buffer
+			script_path->buffer
 		);
 	}
 
-	if (!bat_content)
+	if (!script_content)
 		goto CleanupExit;
 
 	status = _r_fs_createfile (
-		&bat_path->sr,
+		&script_path->sr,
 		FILE_OVERWRITE_IF,
 		FILE_GENERIC_WRITE,
 		FILE_SHARE_READ,
@@ -517,16 +525,25 @@ VOID _app_uninstall_app (
 	if (!NT_SUCCESS (status))
 		goto CleanupExit;
 
-	WriteFile (hfile, bat_content->buffer, (ULONG)bat_content->length, &written, NULL);
+	WriteFile (hfile, script_content->buffer, (ULONG)script_content->length, &written, NULL);
 	CloseHandle (hfile);
 
 	// Delete scheduled task if present
 	_app_taskupdate_deletetask ();
 
+	script_params = _r_format_string (
+		L"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%s\"",
+		script_path->buffer
+	);
+
+	if (!script_params)
+		goto CleanupExit;
+
 	sei.cbSize = sizeof (sei);
 	sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
 	sei.lpVerb = L"open";
-	sei.lpFile = bat_path->buffer;
+	sei.lpFile = L"powershell.exe";
+	sei.lpParameters = script_params->buffer;
 	sei.nShow = SW_HIDE;
 
 	if (ShellExecuteExW (&sei))
@@ -534,11 +551,17 @@ VOID _app_uninstall_app (
 
 CleanupExit:
 
-	if (bat_content)
-		_r_obj_dereference (bat_content);
+	if (script_content)
+		_r_obj_dereference (script_content);
 
-	if (bat_path)
-		_r_obj_dereference (bat_path);
+	if (script_params)
+		_r_obj_dereference (script_params);
+
+	if (script_path)
+		_r_obj_dereference (script_path);
+
+	if (temp_dir)
+		_r_obj_dereference (temp_dir);
 
 	if (app_root)
 		_r_obj_dereference (app_root);

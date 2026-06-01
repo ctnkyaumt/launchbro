@@ -98,25 +98,95 @@ static BOOLEAN _app_reg_read_open_command (
 	_Out_ PR_STRING* command
 )
 {
-	PR_STRING subkey;
+	PR_STRING subkey = NULL;
+	PR_STRING classes_subkey = NULL;
 	BOOLEAN is_success;
 
 	if (!prog_id || _r_obj_isstringempty (prog_id) || !command)
 		return FALSE;
 
-	if (_app_reg_read_string (HKEY_CLASSES_ROOT, prog_id->buffer, L"shell\\open\\command", command))
-		return TRUE;
-
-	subkey = _r_format_string (L"Software\\Classes\\%s", prog_id->buffer);
+	subkey = _r_format_string (L"%s\\shell\\open\\command", prog_id->buffer);
 
 	if (!subkey)
 		return FALSE;
 
-	is_success = _app_reg_read_string (HKEY_CURRENT_USER, subkey->buffer, L"shell\\open\\command", command);
+	if (_app_reg_read_string (HKEY_CLASSES_ROOT, subkey->buffer, NULL, command))
+	{
+		_r_obj_dereference (subkey);
+		return TRUE;
+	}
 
+	classes_subkey = _r_format_string (L"Software\\Classes\\%s", subkey->buffer);
+
+	if (!classes_subkey)
+	{
+		_r_obj_dereference (subkey);
+		return FALSE;
+	}
+
+	is_success = _app_reg_read_string (HKEY_CURRENT_USER, classes_subkey->buffer, NULL, command);
+
+	_r_obj_dereference (classes_subkey);
 	_r_obj_dereference (subkey);
 
 	return is_success;
+}
+
+static PR_STRING _app_insert_profile_dir_in_command (
+	_In_ PR_STRING command,
+	_In_ PR_STRING profile_dir
+);
+
+static BOOLEAN _app_is_firefox_profile_target (
+	_In_ PBROWSER_INFORMATION pbi
+)
+{
+	R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
+	R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
+
+	if (!pbi || _r_obj_isstringempty (pbi->browser_type))
+		return FALSE;
+
+	return
+		_r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) ||
+		_r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE);
+}
+
+static BOOLEAN _app_command_targets_launchbro (
+	_In_ PR_STRING command
+)
+{
+	if (!command || _r_obj_isstringempty (command))
+		return FALSE;
+
+	return (StrStrIW (command->buffer, L"launchbro.exe") != NULL);
+}
+
+static PR_STRING _app_build_profile_open_command (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ PR_STRING command
+)
+{
+	if (!pbi || _r_obj_isstringempty (pbi->binary_path))
+		return NULL;
+
+	if (_app_command_targets_launchbro (command))
+	{
+		if (!_r_obj_isstringempty (pbi->args_str))
+		{
+			if (_app_is_firefox_profile_target (pbi))
+				return _r_format_string (L"\"%s\" %s \"%1\"", pbi->binary_path->buffer, pbi->args_str->buffer);
+
+			return _r_format_string (L"\"%s\" %s -- \"%1\"", pbi->binary_path->buffer, pbi->args_str->buffer);
+		}
+
+		if (_app_is_firefox_profile_target (pbi))
+			return _r_format_string (L"\"%s\" \"%1\"", pbi->binary_path->buffer);
+
+		return _r_format_string (L"\"%s\" -- \"%1\"", pbi->binary_path->buffer);
+	}
+
+	return _app_insert_profile_dir_in_command (command, pbi->profile_dir);
 }
 
 static PR_STRING _app_insert_profile_dir_in_command (
@@ -405,19 +475,27 @@ BOOLEAN _app_patch_registry_profile (
 	}
 
 	// insert profile dir
-	new_command = _app_insert_profile_dir_in_command (command, pbi->profile_dir);
+	new_command = _app_build_profile_open_command (pbi, command);
 
 	if (new_command)
 	{
+		PR_STRING open_command_subkey = _r_format_string (L"%s\\shell\\open\\command", prog_id->buffer);
+
+		if (!open_command_subkey)
+		{
+			_r_obj_dereference (new_command);
+			goto CleanupHttps;
+		}
+
 		// write back - try HKCR first, then HKCU\Software\Classes
-		if (_app_reg_write_string (HKEY_CLASSES_ROOT, prog_id->buffer, L"shell\\open\\command", new_command->buffer))
+		if (_app_reg_write_string (HKEY_CLASSES_ROOT, open_command_subkey->buffer, NULL, new_command->buffer))
 		{
 			is_success = TRUE;
 		}
 		else
 		{
 			// fallback to HKCU
-			PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s\\shell\\open\\command", prog_id->buffer);
+			PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", open_command_subkey->buffer);
 
 			if (subkey)
 			{
@@ -426,9 +504,11 @@ BOOLEAN _app_patch_registry_profile (
 			}
 		}
 
+		_r_obj_dereference (open_command_subkey);
 		_r_obj_dereference (new_command);
 	}
 
+CleanupHttps:
 	// also patch https
 	{
 		PR_STRING https_prog_id = NULL;
@@ -440,13 +520,23 @@ BOOLEAN _app_patch_registry_profile (
 			// only patch if different ProgId or same
 			if (_app_reg_read_open_command (https_prog_id, &https_command))
 			{
-				https_new_command = _app_insert_profile_dir_in_command (https_command, pbi->profile_dir);
+				https_new_command = _app_build_profile_open_command (pbi, https_command);
 
 				if (https_new_command)
 				{
-					if (!_app_reg_write_string (HKEY_CLASSES_ROOT, https_prog_id->buffer, L"shell\\open\\command", https_new_command->buffer))
+					PR_STRING https_open_command_subkey = _r_format_string (L"%s\\shell\\open\\command", https_prog_id->buffer);
+
+					if (!https_open_command_subkey)
 					{
-						PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s\\shell\\open\\command", https_prog_id->buffer);
+						_r_obj_dereference (https_new_command);
+						_r_obj_dereference (https_command);
+						_r_obj_dereference (https_prog_id);
+						goto Cleanup;
+					}
+
+					if (!_app_reg_write_string (HKEY_CLASSES_ROOT, https_open_command_subkey->buffer, NULL, https_new_command->buffer))
+					{
+						PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", https_open_command_subkey->buffer);
 
 						if (subkey)
 						{
@@ -455,6 +545,7 @@ BOOLEAN _app_patch_registry_profile (
 						}
 					}
 
+					_r_obj_dereference (https_open_command_subkey);
 					_r_obj_dereference (https_new_command);
 				}
 
@@ -465,6 +556,7 @@ BOOLEAN _app_patch_registry_profile (
 		}
 	}
 
+Cleanup:
 	_r_obj_dereference (command);
 	_r_obj_dereference (prog_id);
 

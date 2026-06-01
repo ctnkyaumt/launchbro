@@ -136,5 +136,5 @@ ChromiumRunAtEnd=true
 Website: https://github.com/ctnkyaumt
 Support: sforce5@mail.ru
 
-(c) 2015-2026 ctnkyaumt
+2026 ctnkyaumt
 
