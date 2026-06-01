@@ -162,12 +162,32 @@ static BOOLEAN _app_command_targets_launchbro (
 	return (StrStrIW (command->buffer, L"launchbro.exe") != NULL);
 }
 
+static BOOLEAN _app_command_targets_selected_browser (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ PR_STRING command
+)
+{
+	if (!pbi || !command || _r_obj_isstringempty (command))
+		return FALSE;
+
+	if (_app_command_targets_launchbro (command))
+		return TRUE;
+
+	if (!_r_obj_isstringempty (pbi->binary_path) && StrStrIW (command->buffer, pbi->binary_path->buffer))
+		return TRUE;
+
+	return FALSE;
+}
+
 static PR_STRING _app_build_profile_open_command (
 	_In_ PBROWSER_INFORMATION pbi,
 	_In_ PR_STRING command
 )
 {
 	if (!pbi || _r_obj_isstringempty (pbi->binary_path))
+		return NULL;
+
+	if (!_app_command_targets_selected_browser (pbi, command))
 		return NULL;
 
 	if (_app_command_targets_launchbro (command))
@@ -197,6 +217,7 @@ static PR_STRING _app_insert_profile_dir_in_command (
 	static const WCHAR SINGLE_ARGUMENT[] = L"--single-argument";
 	static const WCHAR USER_DATA_DIR[] = L"--user-data-dir";
 	static const WCHAR URL_TOKEN[] = L"-- \"%1";
+	static R_STRINGREF space_sr = PR_STRINGREF_INIT (L" ");
 
 	PR_STRING profile_arg;
 	PR_STRING result;
@@ -207,9 +228,10 @@ static PR_STRING _app_insert_profile_dir_in_command (
 	LPCWSTR insert_pos;
 	LPCWSTR url_pos;
 	LPCWSTR command_end;
-	SIZE_T prefix_len;
-	SIZE_T suffix_len;
-	SIZE_T result_len;
+	R_STRINGREF prefix_sr;
+	R_STRINGREF suffix_sr;
+	ULONG_PTR prefix_len;
+	ULONG_PTR suffix_len;
 	BOOLEAN is_quote = FALSE;
 
 	profile_arg = _r_format_string (L"--user-data-dir=\"%s\"", profile_dir->buffer);
@@ -245,43 +267,19 @@ static PR_STRING _app_insert_profile_dir_in_command (
 		while (*suffix_ptr == L' ' || *suffix_ptr == L'\t')
 			suffix_ptr++;
 
-		prefix_len = (SIZE_T)(replace_start - command->buffer) * sizeof (WCHAR);
-		suffix_len = (SIZE_T)(command_end - suffix_ptr) * sizeof (WCHAR);
+		prefix_len = (ULONG_PTR)(replace_start - command->buffer) * sizeof (WCHAR);
+		suffix_len = (ULONG_PTR)(command_end - suffix_ptr) * sizeof (WCHAR);
+		_r_obj_initializestringref_ex (&prefix_sr, command->buffer, prefix_len);
+		_r_obj_initializestringref_ex (&suffix_sr, (LPWSTR)suffix_ptr, suffix_len);
 
-		result_len = prefix_len +
-			(prefix_len ? sizeof (WCHAR) : 0) +
-			(SIZE_T)profile_arg->length +
-			(suffix_len ? sizeof (WCHAR) : 0) +
-			suffix_len;
-
-		result = _r_obj_createstring_ex (NULL, result_len);
-
-		if (result)
-		{
-			SIZE_T offset = 0;
-
-			if (prefix_len)
-			{
-				RtlCopyMemory (result->buffer, command->buffer, prefix_len);
-				offset += prefix_len;
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-				offset += sizeof (WCHAR);
-			}
-
-			RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), profile_arg->buffer, profile_arg->length);
-			offset += profile_arg->length;
-
-			if (suffix_len)
-			{
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-				offset += sizeof (WCHAR);
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), suffix_ptr, suffix_len);
-			}
-
-			_r_str_trimtonullterminator (&result->sr);
-		}
+		if (prefix_len && suffix_len)
+			result = _r_obj_concatstringrefs (5, &prefix_sr, &space_sr, &profile_arg->sr, &space_sr, &suffix_sr);
+		else if (prefix_len)
+			result = _r_obj_concatstringrefs (3, &prefix_sr, &space_sr, &profile_arg->sr);
+		else if (suffix_len)
+			result = _r_obj_concatstringrefs (3, &profile_arg->sr, &space_sr, &suffix_sr);
+		else
+			result = _r_obj_createstring (profile_arg->buffer);
 
 		_r_obj_dereference (profile_arg);
 
@@ -298,36 +296,15 @@ static PR_STRING _app_insert_profile_dir_in_command (
 		while (insert_pos > command->buffer && *(insert_pos - 1) == L' ')
 			insert_pos--;
 
-		prefix_len = (SIZE_T)(insert_pos - command->buffer) * sizeof (WCHAR);
-		suffix_len = (SIZE_T)command->length - prefix_len;
+		prefix_len = (ULONG_PTR)(insert_pos - command->buffer) * sizeof (WCHAR);
+		suffix_len = (ULONG_PTR)command->length - prefix_len;
+		_r_obj_initializestringref_ex (&prefix_sr, command->buffer, prefix_len);
+		_r_obj_initializestringref_ex (&suffix_sr, (LPWSTR)insert_pos, suffix_len);
 
-		result_len = prefix_len + (SIZE_T)profile_arg->length + sizeof (WCHAR) + suffix_len;
-
-		result = _r_obj_createstring_ex (NULL, result_len);
-
-		if (result)
-		{
-			SIZE_T offset = 0;
-
-			if (prefix_len)
-			{
-				RtlCopyMemory (result->buffer, command->buffer, prefix_len);
-				offset += prefix_len;
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-				offset += sizeof (WCHAR);
-			}
-
-			RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), profile_arg->buffer, profile_arg->length);
-			offset += profile_arg->length;
-
-			RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-			offset += sizeof (WCHAR);
-
-			RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), insert_pos, suffix_len);
-
-			_r_str_trimtonullterminator (&result->sr);
-		}
+		if (prefix_len)
+			result = _r_obj_concatstringrefs (5, &prefix_sr, &space_sr, &profile_arg->sr, &space_sr, &suffix_sr);
+		else
+			result = _r_obj_concatstringrefs (3, &profile_arg->sr, &space_sr, &suffix_sr);
 	}
 	else
 	{
@@ -339,52 +316,19 @@ static PR_STRING _app_insert_profile_dir_in_command (
 			while (url_pos > command->buffer && *(url_pos - 1) == L' ')
 				url_pos--;
 
-			prefix_len = (SIZE_T)(url_pos - command->buffer) * sizeof (WCHAR);
-			suffix_len = (SIZE_T)command->length - prefix_len;
+			prefix_len = (ULONG_PTR)(url_pos - command->buffer) * sizeof (WCHAR);
+			suffix_len = (ULONG_PTR)command->length - prefix_len;
+			_r_obj_initializestringref_ex (&prefix_sr, command->buffer, prefix_len);
+			_r_obj_initializestringref_ex (&suffix_sr, (LPWSTR)url_pos, suffix_len);
 
-			result_len = prefix_len + (SIZE_T)profile_arg->length + sizeof (WCHAR) + suffix_len;
-
-			result = _r_obj_createstring_ex (NULL, result_len);
-
-			if (result)
-			{
-				SIZE_T offset = 0;
-
-				if (prefix_len)
-				{
-					RtlCopyMemory (result->buffer, command->buffer, prefix_len);
-					offset += prefix_len;
-
-					RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-					offset += sizeof (WCHAR);
-				}
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), profile_arg->buffer, profile_arg->length);
-				offset += profile_arg->length;
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), L" ", sizeof (WCHAR));
-				offset += sizeof (WCHAR);
-
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, offset), url_pos, suffix_len);
-
-				_r_str_trimtonullterminator (&result->sr);
-			}
+			if (prefix_len)
+				result = _r_obj_concatstringrefs (5, &prefix_sr, &space_sr, &profile_arg->sr, &space_sr, &suffix_sr);
+			else
+				result = _r_obj_concatstringrefs (3, &profile_arg->sr, &space_sr, &suffix_sr);
 		}
 		else
 		{
-			// append at end
-			result_len = (SIZE_T)command->length + sizeof (WCHAR) + (SIZE_T)profile_arg->length;
-
-			result = _r_obj_createstring_ex (NULL, result_len);
-
-			if (result)
-			{
-				RtlCopyMemory (result->buffer, command->buffer, command->length);
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, command->length), L" ", sizeof (WCHAR));
-				RtlCopyMemory (PTR_ADD_OFFSET (result->buffer, command->length + sizeof (WCHAR)), profile_arg->buffer, profile_arg->length);
-
-				_r_str_trimtonullterminator (&result->sr);
-			}
+			result = _r_obj_concatstringrefs (3, &command->sr, &space_sr, &profile_arg->sr);
 		}
 	}
 
