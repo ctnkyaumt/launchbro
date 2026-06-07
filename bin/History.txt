@@ -1,3 +1,6 @@
+v2.9.2 (7 June 2026)
+- fixes on reg tweak and taskbar icons unification
+
 v2.9.1 (10 May 2026)
 - refactored project to launchbro and added Firefox fork icon support
 - implemented application updater, uninstall, and profile export support
