@@ -195,15 +195,15 @@ static PR_STRING _app_build_profile_open_command (
 		if (!_r_obj_isstringempty (pbi->args_str))
 		{
 			if (_app_is_firefox_profile_target (pbi))
-				return _r_format_string (L"\"%s\" %s \"%1\"", pbi->binary_path->buffer, pbi->args_str->buffer);
+				return _r_format_string (L"\"%s\" %s %1", pbi->binary_path->buffer, pbi->args_str->buffer);
 
-			return _r_format_string (L"\"%s\" %s --single-argument \"%1\"", pbi->binary_path->buffer, pbi->args_str->buffer);
+			return _r_format_string (L"\"%s\" %s --single-argument %1", pbi->binary_path->buffer, pbi->args_str->buffer);
 		}
 
 		if (_app_is_firefox_profile_target (pbi))
-			return _r_format_string (L"\"%s\" \"%1\"", pbi->binary_path->buffer);
+			return _r_format_string (L"\"%s\" %1", pbi->binary_path->buffer);
 
-		return _r_format_string (L"\"%s\" --single-argument \"%1\"", pbi->binary_path->buffer);
+		return _r_format_string (L"\"%s\" --single-argument %1", pbi->binary_path->buffer);
 	}
 
 	return _app_insert_profile_dir_in_command (command, pbi->profile_dir);
