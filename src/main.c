@@ -1141,7 +1141,8 @@ INT_PTR CALLBACK DlgProc (
 				case IDM_ABOUT:
 				case IDM_TRAY_ABOUT:
 				{
-					_r_show_aboutmessage (hwnd);
+					_r_show_message (hwnd, MB_OK | MB_ICONINFORMATION, APP_NAME,
+						APP_NAME L" v" APP_VERSION L"\r\n" APP_COPYRIGHT);
 					break;
 				}
 

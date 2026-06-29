@@ -1,3 +1,9 @@
+v2.9.3 (29 June 2026)
+- fixed registry tweak using --single-argument instead of -- for correct URL handling
+- fixed http://https// double-scheme issue when opening links via default browser
+- bumped version from 2.7 to 2.9.3 (was never updated, causing false update notifications)
+- removed donation section from about dialog
+
 v2.9.2 (7 June 2026)
 - fixes on reg tweak and taskbar icons unification
 
