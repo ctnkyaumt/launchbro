@@ -8,28 +8,17 @@
 
 #include <shlobj.h>
 #include <shobjidl.h>
-#include <propsys.h>
-#include <propkey.h>
 
-static PR_STRING _app_get_taskbar_appid (
-	_In_ PBROWSER_INFORMATION pbi
-)
-{
-	R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-	R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-
-	if (!pbi || _r_obj_isstringempty (pbi->browser_type))
-		return NULL;
-
-	if (_r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) ||
-		_r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE))
-	{
-		return _r_obj_createstring (L"Firefox");
-	}
-
-	return _r_obj_createstring (L"Chromium");
-}
-
+// Deliberately do NOT stamp a custom PKEY_AppUserModel_ID on this shortcut. Windows only
+// unifies a taskbar pin with a running window's taskbar button when both carry the same
+// AppUserModelID, and a custom one here is only ever visible to Windows when the shortcut is
+// what launches the browser - clicking a PINNED copy of this .lnk launches chrome.exe directly
+// (Explorer never goes through launchbro.exe), so nothing on our side can also stamp a matching
+// ID onto that resulting window. Leaving the shortcut's AppUserModelID unset means both the pin
+// and any window opened from this exact binary_path fall back to Windows' own default (which is
+// derived from the target path), so they agree no matter how the browser was actually launched.
+// Each instance already lives in its own bin/bin2/bin3/bin4 folder, so that path-based default
+// still keeps separate profile instances visually distinct in the taskbar.
 VOID _app_create_profileshortcut (
 	_In_ PBROWSER_INFORMATION pbi
 )
@@ -37,13 +26,10 @@ VOID _app_create_profileshortcut (
 	PWSTR desktop_path = NULL;
 	PR_STRING link_title = NULL;
 	PR_STRING link_path = NULL;
-	PR_STRING app_id = NULL;
 	HRESULT hr_init;
 	HRESULT hr;
 	IShellLinkW *psl = NULL;
 	IPersistFile *ppf = NULL;
-	IPropertyStore *pps = NULL;
-	PROPVARIANT pv = {0};
 
 	if (!pbi || _r_obj_isstringempty (pbi->binary_path) || _r_obj_isstringempty (pbi->profile_dir))
 		return;
@@ -110,31 +96,6 @@ VOID _app_create_profileshortcut (
 
 		psl->lpVtbl->SetIconLocation (psl, pbi->binary_path->buffer, 0);
 		psl->lpVtbl->SetDescription (psl, link_title->buffer);
-
-		app_id = _app_get_taskbar_appid (pbi);
-
-		if (app_id)
-		{
-			hr = psl->lpVtbl->QueryInterface (psl, &IID_IPropertyStore, (PVOID_PTR)&pps);
-
-			if (SUCCEEDED (hr) && pps)
-			{
-				pv.vt = VT_LPWSTR;
-				pv.pwszVal = CoTaskMemAlloc (app_id->length + sizeof (WCHAR));
-
-				if (pv.pwszVal)
-				{
-					RtlCopyMemory (pv.pwszVal, app_id->buffer, app_id->length + sizeof (WCHAR));
-					pps->lpVtbl->SetValue (pps, &PKEY_AppUserModel_ID, &pv);
-					pps->lpVtbl->Commit (pps);
-					PropVariantClear (&pv);
-				}
-
-				pps->lpVtbl->Release (pps);
-			}
-
-			_r_obj_dereference (app_id);
-		}
 
 		hr = psl->lpVtbl->QueryInterface (psl, &IID_IPersistFile, (PVOID_PTR)&ppf);
 

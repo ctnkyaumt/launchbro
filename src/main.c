@@ -478,7 +478,12 @@ VOID _app_thread_check (
 			_app_ensure_registry_profile (hwnd, pbi);
 	}
 
-	if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE) && !pbi->is_onlyupdate)
+	// When is_waitdownloadend is set, opening the browser is deferred to WM_DESTROY (fired
+	// below when !is_stayopen) so we don't launch it while an update might still be
+	// downloading/installing. Without this guard, both this call AND the WM_DESTROY one would
+	// fire - the WM_DESTROY one arriving late (whenever the window actually closes, possibly
+	// much later if is_stayopen was set on an earlier run) and re-launching a second time.
+	if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE) && !pbi->is_onlyupdate && !pbi->is_waitdownloadend)
 		_app_openbrowser (pbi);
 
 	_r_queuedlock_releaseshared (&lock_thread);
