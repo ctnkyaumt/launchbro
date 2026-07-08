@@ -499,7 +499,9 @@ BOOLEAN _app_ensure_registry_profile (
 )
 {
 	PR_STRING cmdline;
+	PR_STRING runonce_key = NULL;
 	NTSTATUS status;
+	BOOLEAN is_declined = FALSE;
 
 	if (!pbi || _r_obj_isstringempty (pbi->binary_path) || _r_obj_isstringempty (pbi->profile_dir))
 		return FALSE;
@@ -511,17 +513,46 @@ BOOLEAN _app_ensure_registry_profile (
 	if (_app_is_registry_patched (pbi))
 		return TRUE;
 
-	// if the default browser command already exists, patch it directly first
+	// if the default browser command already exists, patch it directly first (silent, no
+	// dialog - this is what makes the patch self-heal the moment the user sets Chromium as
+	// their Windows default browser via Settings, on any later launch)
 	if (_app_patch_registry_profile (pbi))
 		return TRUE;
 
+	// Patching failed. Either Chromium has never self-registered its ProgId yet (fixed by
+	// running it once), or - just as commonly - the user simply hasn't picked Chromium as the
+	// Windows default browser yet. Only the user can do that via Settings; relaunching
+	// Chromium changes nothing in that case. We cannot tell these two apart from the registry
+	// alone, so do the intrusive "launch and close" dance at most ONCE with consent, instead
+	// of re-prompting on every single startup forever when it is the second (common) case.
+	if (pbi->instance_id > 1)
+		runonce_key = _r_format_string (L"RegistryProfileRunOnce%" TEXT (PR_LONG), pbi->instance_id);
+
+	if (_r_config_getboolean (runonce_key ? runonce_key->buffer : L"RegistryProfileRunOnce", FALSE))
+	{
+		if (runonce_key)
+			_r_obj_dereference (runonce_key);
+
+		return FALSE;
+	}
+
 	// registry keys don't exist yet - browser needs to run once to register itself
 	// prompt user before doing this
-	if (_r_show_message (hwnd, MB_YESNO | MB_ICONQUESTION, NULL,
+	is_declined = (_r_show_message (hwnd, MB_YESNO | MB_ICONQUESTION, NULL,
 		L"Chromium needs to run once to register as a browser before the profile path can be set in the registry.\n\n"
 		L"This will launch Chromium briefly and close it automatically.\n\n"
-		L"Do you want to proceed?") != IDYES)
+		L"Do you want to proceed?") != IDYES);
+
+	// remember the outcome either way, so we never ask again after this
+	_r_config_setboolean (runonce_key ? runonce_key->buffer : L"RegistryProfileRunOnce", TRUE);
+
+	if (is_declined)
+	{
+		if (runonce_key)
+			_r_obj_dereference (runonce_key);
+
 		return FALSE;
+	}
 
 	// launch browser with --no-first-run --user-data-dir to create profile and register
 	cmdline = _r_format_string (L"\"%s\" --no-first-run --user-data-dir=\"%s\"",
@@ -529,14 +560,24 @@ BOOLEAN _app_ensure_registry_profile (
 		pbi->profile_dir->buffer);
 
 	if (!cmdline)
+	{
+		if (runonce_key)
+			_r_obj_dereference (runonce_key);
+
 		return FALSE;
+	}
 
 	status = _r_sys_createprocess (pbi->binary_path->buffer, cmdline->buffer, pbi->binary_dir->buffer, FALSE);
 
 	_r_obj_dereference (cmdline);
 
 	if (!NT_SUCCESS (status))
+	{
+		if (runonce_key)
+			_r_obj_dereference (runonce_key);
+
 		return FALSE;
+	}
 
 	// wait a few seconds for the browser to register itself and create profile files
 	Sleep (5000);
@@ -587,6 +628,9 @@ BOOLEAN _app_ensure_registry_profile (
 
 	// give it a moment after closing
 	Sleep (2000);
+
+	if (runonce_key)
+		_r_obj_dereference (runonce_key);
 
 	// now try to patch the registry
 	return _app_patch_registry_profile (pbi);

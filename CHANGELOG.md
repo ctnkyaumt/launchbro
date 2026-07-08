@@ -1,3 +1,6 @@
+v2.9.9 (8 July 2026)
+- fixed the "Chromium needs to run once to register as a browser" dialog reappearing on every single launch: it now asks (and does the launch-and-close registration dance) at most once. The common cause is that Windows' default browser was never actually set to Chromium via Settings - relaunching Chromium cannot fix that by itself, only the user can, so nagging every startup accomplished nothing. The silent, non-prompting registry patch still runs on every launch and self-applies automatically the moment the user does set Chromium as default.
+
 v2.9.8 (8 July 2026)
 - fixed default-browser links doing nothing (and the registry patch refusing to apply / re-prompting "run once") after the chrlauncher->launchbro migration: the http/https handler still pointed at the old chrlauncher chrome.exe path. launchbro now recognizes a stale reference to its own moved browser (same exe name, path no longer on disk), repoints the command to the current binary, and injects the profile. A real browser present on disk (e.g. Google Chrome) is never touched.
 
