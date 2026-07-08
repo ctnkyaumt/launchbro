@@ -1,3 +1,8 @@
+v2.9.6 (8 July 2026)
+- fixed default browser links still not launching: the registry patch now edits HKEY_CLASSES_ROOT\{ProgId}\shell\open\command (and the per-user Classes override), matching the known-working manual fix, and DELETES any DelegateExecute value instead of writing an empty one (the empty value from 2.9.4 itself blocked activation; this repairs those machines on next run)
+- uninstall now removes the desktop shortcuts it created (they used to be left behind) and reverts the default-browser --user-data-dir edit so no stale profile path is left in the http/https handler
+- build-zip/release workflows now stamp the exe version from CHANGELOG.md automatically, so test builds no longer ship a stale version number
+
 v2.9.5 (8 July 2026)
 - fixed "Download update" button doing nothing when the browser was already installed and auto-download was off
 - fixed profile export/import scanning the wrong folder (missed the 32/64 arch subfolder), so nothing was ever exported

@@ -23,6 +23,22 @@ jobs:
             git clone --depth 1 https://github.com/henrypp/routine.git ..\routine
           }
 
+      - name: Set version from CHANGELOG
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $first = (Get-Content -LiteralPath CHANGELOG.md | Where-Object { $_ -match '\S' } | Select-Object -First 1)
+          if ($first -notmatch '^v(?<ver>\d+\.\d+(?:\.\d+)?)\b') { throw "Cannot parse version from CHANGELOG.md first line: $first" }
+          $ver = $Matches['ver']
+          $res = ((@($ver.Split('.')) + @('0','0','0'))[0..3]) -join ','
+          $apph = 'src\app.h'
+          $c = Get-Content -LiteralPath $apph -Raw
+          $c = $c -replace '(#define\s+APP_VERSION\s+L")[^"]*(")', ('${1}' + $ver + '${2}')
+          $c = $c -replace '(#define\s+APP_VERSION_RES\s+)[0-9, ]+', ('${1}' + $res)
+          Set-Content -LiteralPath $apph -Value $c -Encoding utf8
+          Copy-Item -Force CHANGELOG.md bin\History.txt
+          Write-Host "Version set to $ver ($res)"
+
       - name: Build Release x64
         run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
 

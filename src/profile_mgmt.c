@@ -545,6 +545,25 @@ VOID _app_uninstall_app (
 			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
 			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
 			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
+			L"$wsh = New-Object -ComObject WScript.Shell\r\n"
+			L"foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'))) {\r\n"
+			L"  if (!$d -or !(Test-Path $d)) { continue }\r\n"
+			L"  Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {\r\n"
+			L"    try {\r\n"
+			L"      $t = $wsh.CreateShortcut($_.FullName).TargetPath\r\n"
+			L"      if ($t -and @($roots | Where-Object { $t.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {\r\n"
+			L"        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue\r\n"
+			L"      }\r\n"
+			L"    } catch {}\r\n"
+			L"  }\r\n"
+			L"}\r\n"
+			L"foreach ($h in @('HKCU:', 'HKLM:')) {\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroHTML') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroURL') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro.EXE') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-ItemProperty -LiteralPath ($h + '\\Software\\RegisteredApplications') -Name 'launchbro' -ErrorAction SilentlyContinue\r\n"
+			L"}\r\n"
 			L"foreach ($arch in @('32', '64')) {\r\n"
 			L"  $archRoot = Join-Path $Root $arch\r\n"
 			L"  if (!(Test-Path $archRoot)) { continue }\r\n"
@@ -573,6 +592,25 @@ VOID _app_uninstall_app (
 			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
 			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
 			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
+			L"$wsh = New-Object -ComObject WScript.Shell\r\n"
+			L"foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'))) {\r\n"
+			L"  if (!$d -or !(Test-Path $d)) { continue }\r\n"
+			L"  Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {\r\n"
+			L"    try {\r\n"
+			L"      $t = $wsh.CreateShortcut($_.FullName).TargetPath\r\n"
+			L"      if ($t -and @($roots | Where-Object { $t.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {\r\n"
+			L"        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue\r\n"
+			L"      }\r\n"
+			L"    } catch {}\r\n"
+			L"  }\r\n"
+			L"}\r\n"
+			L"foreach ($h in @('HKCU:', 'HKLM:')) {\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroHTML') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroURL') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro.EXE') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+			L"  Remove-ItemProperty -LiteralPath ($h + '\\Software\\RegisteredApplications') -Name 'launchbro' -ErrorAction SilentlyContinue\r\n"
+			L"}\r\n"
 			L"Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue\r\n"
 			L"Start-Sleep -Milliseconds 500\r\n"
 			L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
@@ -604,6 +642,10 @@ VOID _app_uninstall_app (
 
 	// Delete scheduled task if present
 	_app_taskupdate_deletetask ();
+
+	// Revert the default-browser profile edit so we don't leave the http/https handler
+	// pointing at a profile folder that is about to be deleted.
+	_app_unpatch_registry_associations ();
 
 	script_params = _r_format_string (
 		L"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"%s\"",

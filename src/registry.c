@@ -93,32 +93,87 @@ static BOOLEAN _app_reg_write_string (
 	return (status == ERROR_SUCCESS);
 }
 
-// Chromium registers a `DelegateExecute` COM handler under <ProgId>\shell\open.
-// When present, the Windows shell launches the browser through that handler and
-// IGNORES the (Default) command string we patch with --user-data-dir. Windows 11
-// honours it strictly, so links open the browser's default profile (or nothing)
-// instead of our custom profile. Writing an empty DelegateExecute forces the
-// shell to fall back to the command line we control.
-static BOOLEAN _app_reg_clear_delegate_execute (
+static VOID _app_reg_delete_value (
 	_In_ HKEY hkey,
-	_In_ LPCWSTR prog_id,
-	_In_ BOOLEAN is_classes_prefixed
+	_In_ LPCWSTR subkey,
+	_In_ LPCWSTR value_name
 )
 {
-	PR_STRING open_subkey;
-	BOOLEAN is_success;
+	HKEY key = NULL;
 
-	if (is_classes_prefixed)
-		open_subkey = _r_format_string (L"Software\\Classes\\%s\\shell\\open", prog_id);
-	else
-		open_subkey = _r_format_string (L"%s\\shell\\open", prog_id);
+	if (RegOpenKeyExW (hkey, subkey, 0, KEY_SET_VALUE, &key) == ERROR_SUCCESS)
+	{
+		RegDeleteValueW (key, value_name);
+		RegCloseKey (key);
+	}
+}
 
-	if (!open_subkey)
-		return FALSE;
+// Some Chromium builds register a `DelegateExecute` COM handler under <ProgId>\shell\open.
+// When present, the shell launches the browser through that handler and IGNORES the
+// (Default) command string we patch with --user-data-dir. Deleting the value forces the
+// shell to fall back to the command line we control. Deleting is a no-op when it is absent
+// (the common ungoogled-chromium case), so this matches the known-working manual edit which
+// only touches the command. An earlier build wrote an *empty* DelegateExecute here, which
+// itself blocked activation; deleting also repairs those machines.
+static VOID _app_reg_delete_delegate_execute (
+	_In_ LPCWSTR prog_id
+)
+{
+	PR_STRING hkcr_open;
+	PR_STRING hkcu_open;
 
-	is_success = _app_reg_write_string (hkey, open_subkey->buffer, L"DelegateExecute", L"");
+	hkcr_open = _r_format_string (L"%s\\shell\\open", prog_id);
 
-	_r_obj_dereference (open_subkey);
+	if (hkcr_open)
+	{
+		_app_reg_delete_value (HKEY_CLASSES_ROOT, hkcr_open->buffer, L"DelegateExecute");
+		_r_obj_dereference (hkcr_open);
+	}
+
+	hkcu_open = _r_format_string (L"Software\\Classes\\%s\\shell\\open", prog_id);
+
+	if (hkcu_open)
+	{
+		_app_reg_delete_value (HKEY_CURRENT_USER, hkcu_open->buffer, L"DelegateExecute");
+		_r_obj_dereference (hkcu_open);
+	}
+}
+
+// Write the patched open command exactly like the proven manual fix: edit
+// HKEY_CLASSES_ROOT\<ProgId>\shell\open\command. Also mirror it into the per-user
+// Software\Classes override so it still applies when HKCR resolves to an HKLM key we
+// cannot write without elevation. Success if either write lands.
+static BOOLEAN _app_patch_progid_command (
+	_In_ PR_STRING prog_id,
+	_In_ PR_STRING new_command
+)
+{
+	PR_STRING hkcr_command;
+	PR_STRING hkcu_command;
+	BOOLEAN is_success = FALSE;
+
+	hkcr_command = _r_format_string (L"%s\\shell\\open\\command", prog_id->buffer);
+
+	if (hkcr_command)
+	{
+		if (_app_reg_write_string (HKEY_CLASSES_ROOT, hkcr_command->buffer, NULL, new_command->buffer))
+			is_success = TRUE;
+
+		_r_obj_dereference (hkcr_command);
+	}
+
+	hkcu_command = _r_format_string (L"Software\\Classes\\%s\\shell\\open\\command", prog_id->buffer);
+
+	if (hkcu_command)
+	{
+		if (_app_reg_write_string (HKEY_CURRENT_USER, hkcu_command->buffer, NULL, new_command->buffer))
+			is_success = TRUE;
+
+		_r_obj_dereference (hkcu_command);
+	}
+
+	if (is_success)
+		_app_reg_delete_delegate_execute (prog_id->buffer);
 
 	return is_success;
 }
@@ -390,8 +445,9 @@ static BOOLEAN _app_command_has_profile_dir (
 	return is_match;
 }
 
-// Returns TRUE when the effective (merged HKCR) DelegateExecute for this ProgId is
-// absent or empty, i.e. the shell will honour our patched command string.
+// Returns TRUE only when NO DelegateExecute is registered (absent) for this ProgId in the
+// effective (merged HKCR) view. A present value - even an empty one left by an older build -
+// blocks activation, so it counts as not cleared and forces a re-patch that deletes it.
 static BOOLEAN _app_is_delegate_execute_cleared (
 	_In_ LPCWSTR prog_id
 )
@@ -407,7 +463,8 @@ static BOOLEAN _app_is_delegate_execute_cleared (
 
 	if (_app_reg_read_string (HKEY_CLASSES_ROOT, open_subkey->buffer, L"DelegateExecute", &delegate))
 	{
-		is_cleared = _r_obj_isstringempty (delegate);
+		// value exists (empty or a real CLSID) -> not cleared
+		is_cleared = FALSE;
 		_r_obj_dereference (delegate);
 	}
 
@@ -452,137 +509,160 @@ static BOOLEAN _app_is_protocol_registry_patched (
 	return is_patched;
 }
 
+static BOOLEAN _app_patch_protocol_profile (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ LPCWSTR protocol
+)
+{
+	PR_STRING assoc_subkey;
+	PR_STRING prog_id = NULL;
+	PR_STRING command = NULL;
+	PR_STRING new_command;
+	BOOLEAN is_success = FALSE;
+
+	assoc_subkey = _r_format_string (
+		L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\%s\\UserChoice",
+		protocol
+	);
+
+	if (!assoc_subkey)
+		return FALSE;
+
+	// read the ProgId the user chose for this protocol, then its shell\open\command
+	if (_app_reg_read_string (HKEY_CURRENT_USER, assoc_subkey->buffer, L"ProgId", &prog_id) &&
+		_app_reg_read_open_command (prog_id, &command))
+	{
+		new_command = _app_build_profile_open_command (pbi, command);
+
+		if (new_command)
+		{
+			is_success = _app_patch_progid_command (prog_id, new_command);
+
+			_r_obj_dereference (new_command);
+		}
+	}
+
+	if (command)
+		_r_obj_dereference (command);
+
+	if (prog_id)
+		_r_obj_dereference (prog_id);
+
+	_r_obj_dereference (assoc_subkey);
+
+	return is_success;
+}
+
 BOOLEAN _app_patch_registry_profile (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {
-	PR_STRING prog_id = NULL;
-	PR_STRING command = NULL;
-	PR_STRING new_command = NULL;
-	BOOLEAN is_success = FALSE;
+	BOOLEAN http_ok;
+	BOOLEAN https_ok;
 
 	if (!pbi || _r_obj_isstringempty (pbi->profile_dir))
 		return FALSE;
 
-	// read ProgId from UserChoice for http
-	if (!_app_reg_read_string (HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice", L"ProgId", &prog_id))
-		return FALSE;
+	http_ok = _app_patch_protocol_profile (pbi, L"http");
+	https_ok = _app_patch_protocol_profile (pbi, L"https");
 
-	// read open command from the ProgId
-	if (!_app_reg_read_open_command (prog_id, &command))
+	return (http_ok || https_ok);
+}
+
+// Remove the --user-data-dir="..." switch we injected, returning the command to its
+// original form. Returns NULL when the switch is not present.
+static PR_STRING _app_remove_user_data_dir (
+	_In_ PR_STRING command
+)
+{
+	static const WCHAR USER_DATA_DIR[] = L"--user-data-dir";
+
+	LPCWSTR match;
+	LPCWSTR start;
+	LPCWSTR end;
+	LPCWSTR command_end;
+	R_STRINGREF prefix_sr;
+	R_STRINGREF suffix_sr;
+	BOOLEAN is_quote = FALSE;
+
+	if (!command || _r_obj_isstringempty (command))
+		return NULL;
+
+	match = StrStrIW (command->buffer, USER_DATA_DIR);
+
+	if (!match)
+		return NULL;
+
+	command_end = command->buffer + (command->length / sizeof (WCHAR));
+
+	// swallow one separating space before the switch
+	start = match;
+
+	while (start > command->buffer && *(start - 1) == L' ')
+		start--;
+
+	// scan to the end of --user-data-dir="..." honouring quotes
+	end = match;
+
+	while (end < command_end && *end)
 	{
-		_r_obj_dereference (prog_id);
-		return FALSE;
+		if (*end == L'"')
+			is_quote = !is_quote;
+
+		if (!is_quote && (*end == L' ' || *end == L'\t'))
+			break;
+
+		end++;
 	}
 
-	// insert profile dir
-	new_command = _app_build_profile_open_command (pbi, command);
+	_r_obj_initializestringref_ex (&prefix_sr, command->buffer, (ULONG_PTR)(start - command->buffer) * sizeof (WCHAR));
+	_r_obj_initializestringref_ex (&suffix_sr, (LPWSTR)end, (ULONG_PTR)(command_end - end) * sizeof (WCHAR));
 
-	if (new_command)
+	return _r_obj_concatstringrefs (2, &prefix_sr, &suffix_sr);
+}
+
+// Uninstall cleanup: strip the injected profile switch from the default-browser command
+// so we don't leave the http/https handler pointing at a deleted profile folder.
+VOID _app_unpatch_registry_associations (VOID)
+{
+	static LPCWSTR protocols[] = {L"http", L"https"};
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (protocols); i++)
 	{
-		PR_STRING open_command_subkey = _r_format_string (L"%s\\shell\\open\\command", prog_id->buffer);
+		PR_STRING assoc_subkey;
+		PR_STRING prog_id = NULL;
+		PR_STRING command = NULL;
+		PR_STRING new_command;
 
-		if (!open_command_subkey)
+		assoc_subkey = _r_format_string (
+			L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\%s\\UserChoice",
+			protocols[i]
+		);
+
+		if (!assoc_subkey)
+			continue;
+
+		if (_app_reg_read_string (HKEY_CURRENT_USER, assoc_subkey->buffer, L"ProgId", &prog_id) &&
+			_app_reg_read_open_command (prog_id, &command))
 		{
-			_r_obj_dereference (new_command);
-			goto CleanupHttps;
-		}
+			new_command = _app_remove_user_data_dir (command);
 
-		// Prefer the per-user Classes override because UserChoice defaults are per-user too.
-		{
-			PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", open_command_subkey->buffer);
-
-			if (subkey)
+			if (new_command)
 			{
-				is_success = _app_reg_write_string (HKEY_CURRENT_USER, subkey->buffer, NULL, new_command->buffer);
+				_app_patch_progid_command (prog_id, new_command);
 
-				if (is_success)
-					_app_reg_clear_delegate_execute (HKEY_CURRENT_USER, prog_id->buffer, TRUE);
-
-				_r_obj_dereference (subkey);
+				_r_obj_dereference (new_command);
 			}
 		}
 
-		// Fallback to HKCR only if the user-level write did not succeed.
-		if (!is_success && _app_reg_write_string (HKEY_CLASSES_ROOT, open_command_subkey->buffer, NULL, new_command->buffer))
-		{
-			is_success = TRUE;
+		if (command)
+			_r_obj_dereference (command);
 
-			_app_reg_clear_delegate_execute (HKEY_CLASSES_ROOT, prog_id->buffer, FALSE);
-		}
+		if (prog_id)
+			_r_obj_dereference (prog_id);
 
-		_r_obj_dereference (open_command_subkey);
-		_r_obj_dereference (new_command);
+		_r_obj_dereference (assoc_subkey);
 	}
-
-CleanupHttps:
-	// also patch https
-	{
-		PR_STRING https_prog_id = NULL;
-		PR_STRING https_command = NULL;
-		PR_STRING https_new_command = NULL;
-
-		if (_app_reg_read_string (HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice", L"ProgId", &https_prog_id))
-		{
-			// only patch if different ProgId or same
-			if (_app_reg_read_open_command (https_prog_id, &https_command))
-			{
-				https_new_command = _app_build_profile_open_command (pbi, https_command);
-
-				if (https_new_command)
-				{
-					PR_STRING https_open_command_subkey = _r_format_string (L"%s\\shell\\open\\command", https_prog_id->buffer);
-					BOOLEAN https_is_success = FALSE;
-
-					if (!https_open_command_subkey)
-					{
-						_r_obj_dereference (https_new_command);
-						_r_obj_dereference (https_command);
-						_r_obj_dereference (https_prog_id);
-						goto Cleanup;
-					}
-
-					{
-						PR_STRING subkey = _r_format_string (L"Software\\Classes\\%s", https_open_command_subkey->buffer);
-
-						if (subkey)
-						{
-							https_is_success = _app_reg_write_string (HKEY_CURRENT_USER, subkey->buffer, NULL, https_new_command->buffer);
-
-							if (https_is_success)
-								_app_reg_clear_delegate_execute (HKEY_CURRENT_USER, https_prog_id->buffer, TRUE);
-
-							_r_obj_dereference (subkey);
-						}
-					}
-
-					if (!https_is_success)
-					{
-						https_is_success = _app_reg_write_string (HKEY_CLASSES_ROOT, https_open_command_subkey->buffer, NULL, https_new_command->buffer);
-
-						if (https_is_success)
-							_app_reg_clear_delegate_execute (HKEY_CLASSES_ROOT, https_prog_id->buffer, FALSE);
-					}
-
-					if (!is_success && https_is_success)
-						is_success = TRUE;
-
-					_r_obj_dereference (https_open_command_subkey);
-					_r_obj_dereference (https_new_command);
-				}
-
-				_r_obj_dereference (https_command);
-			}
-
-			_r_obj_dereference (https_prog_id);
-		}
-	}
-
-Cleanup:
-	_r_obj_dereference (command);
-	_r_obj_dereference (prog_id);
-
-	return is_success;
 }
 
 BOOLEAN _app_is_registry_patched (

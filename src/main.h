@@ -81,6 +81,8 @@ BOOLEAN _app_patch_registry_profile (
 	_In_ PBROWSER_INFORMATION pbi
 );
 
+VOID _app_unpatch_registry_associations (VOID);
+
 // task update
 BOOLEAN _app_taskupdate_istaskpresent ();
 BOOLEAN _app_taskupdate_setstartwhenavailable ();
