@@ -262,9 +262,9 @@ VOID _app_thread_taskupdate_all (
 			pbi = &instances[instance_id - 1];
 		}
 
-		if (!pbi->args_str)
-			continue;
-
+		// Always reopen a browser we just closed for the update, even if args_str is empty
+		// (e.g. ChromiumCommandLine cleared in config) - skipping _app_openbrowser here would
+		// silently leave the user's browser closed after a background auto-update.
 		restore_args = _r_obj_concatstrings (2, _r_obj_getstring (pbi->args_str), L" --restore-last-session");
 
 		if (restore_args)

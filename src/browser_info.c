@@ -818,7 +818,7 @@ VOID _app_init_browser_info (
 		pbi->is_waitdownloadend = _r_config_getboolean (L"ChromiumWaitForDownloadEnd", TRUE);
 
 	if (!pbi->is_onlyupdate)
-		pbi->is_onlyupdate = _r_config_getboolean (L"ChromiumUpdateOnly", TRUE);
+		pbi->is_onlyupdate = _r_config_getboolean (L"ChromiumUpdateOnly", FALSE);
 
 	if (pbi->is_onlyupdate)
 	{

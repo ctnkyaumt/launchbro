@@ -1,3 +1,8 @@
+v2.9.10 (8 July 2026)
+- fixed "Run at end" appearing to do nothing: ChromiumUpdateOnly's shipped/fallback default (true) contradicted its own documented default ("false -> update & start Chromium (default)"), so is_onlyupdate was TRUE on every normal launch and silently blocked every _app_openbrowser call gated on it, regardless of the Run at end setting. Default now matches the documentation (false); the /update command-line flag still forces update-only mode when explicitly requested.
+- fixed the scheduled auto-update task potentially leaving a browser closed after updating: the relaunch-with-previous-tabs step skipped reopening entirely when a browser instance's command-line args happened to be empty, instead of still relaunching it with --restore-last-session.
+- audited remaining "chrlauncher" references: all are intentional (migration detection and legacy-install cleanup, which must name the old folder to find it) - no stray branding left.
+
 v2.9.9 (8 July 2026)
 - fixed the "Chromium needs to run once to register as a browser" dialog reappearing on every single launch: it now asks (and does the launch-and-close registration dance) at most once. The common cause is that Windows' default browser was never actually set to Chromium via Settings - relaunching Chromium cannot fix that by itself, only the user can, so nagging every startup accomplished nothing. The silent, non-prompting registry patch still runs on every launch and self-applies automatically the moment the user does set Chromium as default.
 
