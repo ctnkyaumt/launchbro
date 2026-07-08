@@ -52,6 +52,8 @@ VOID _app_parse_args (
 
 	first_arg_length = _r_str_getlength (arga[0]);
 
+	pbi->is_hasargs = (numargs > 1);
+
 	if (numargs > 1)
 	{
 		for (INT i = 1; i < numargs; i++)

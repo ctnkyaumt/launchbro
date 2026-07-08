@@ -55,6 +55,7 @@ typedef struct _BROWSER_INFORMATION
 	BOOLEAN is_deletetorecycle;
 	BOOLEAN is_forcecheck;
 	BOOLEAN is_forcedownload;
+	BOOLEAN is_hasargs;
 	BOOLEAN is_hasurls;
 	BOOLEAN is_onlyupdate;
 	BOOLEAN is_opennewwindow;

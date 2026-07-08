@@ -716,7 +716,27 @@ INT_PTR CALLBACK DlgProc (
 
 			_r_taskbar_initialize (&browser_info.htaskbar);
 
-			_r_workqueue_queueitem (&workqueue, &_app_thread_check, &browser_info);
+			// A bare launch (no CLI args at all - a plain double-click of the Start Menu
+			// shortcut) just shows the UI and waits for the user; it does not auto-check or
+			// auto-launch the browser, since that used to close the window before the user
+			// could ever see or use it. Any other invocation (the scheduled task's /taskupdate,
+			// a URL routed through launchbro.exe, /update, etc.) keeps running the check flow
+			// automatically as before - the day-to-day "just open the browser" path is the
+			// Desktop shortcut, which launches the browser directly and never goes through here.
+			if (browser_info.is_hasargs)
+			{
+				_r_workqueue_queueitem (&workqueue, &_app_thread_check, &browser_info);
+			}
+			else
+			{
+				_app_update_browser_info (hwnd, &browser_info);
+
+				_r_ctrl_setstring (hwnd, IDC_START_BTN, _r_locale_getstring (_app_getactionid (&browser_info)));
+				_r_ctrl_enable (hwnd, IDC_START_BTN, TRUE);
+
+				_r_tray_toggle (hwnd, &GUID_TrayIcon, TRUE);
+				_r_wnd_toggle (hwnd, TRUE);
+			}
 
 			break;
 		}
