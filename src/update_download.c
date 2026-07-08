@@ -478,7 +478,8 @@ BOOLEAN _app_checkupdate (
 
 					if (_r_obj_isstringempty (string))
 					{
-						_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+						// non-fatal: server returned no config; caller surfaces a tray notification
+						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", 0, L"Update configuration was not found");
 
 						*is_error_ptr = TRUE;
 					}
@@ -489,7 +490,9 @@ BOOLEAN _app_checkupdate (
 				}
 				else
 				{
-					_r_show_errormessage (hwnd, NULL, status, L"Could not download update.", ET_WINHTTP);
+					// transient network/DNS failures (e.g. 12007) happen on startup before the
+					// connection is ready - log instead of blocking the user with a modal dialog
+					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", status, L"Could not download update");
 
 					*is_error_ptr = TRUE;
 				}
