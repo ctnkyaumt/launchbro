@@ -9,8 +9,13 @@
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "launchbro-setup.exe"
-InstallDir "$PROGRAMFILES64\${APP_NAME}"
-RequestExecutionLevel admin
+; Per-user install under Documents, not Program Files: launchbro.exe runs asInvoker (see
+; res/manifest.xml) and self-updates its own install folder (browser downloads/installs,
+; self-update) without ever elevating. Program Files requires admin to write to, which broke
+; every self-update after a Program-Files install - Documents is always writable by the owning
+; user, so no admin/UAC is needed to install OR to keep updating afterward.
+InstallDir "$DOCUMENTS\${APP_NAME}"
+RequestExecutionLevel user
 
 ; Pages
 !insertmacro MUI_PAGE_WELCOME
@@ -40,12 +45,12 @@ Section "Install"
     CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\64\launchbro.exe"
     CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 
-    ; Registry entries
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayIcon" "$INSTDIR\64\launchbro.exe"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "Publisher" "ctnkyaumt"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${APP_VERSION}"
+    ; Registry entries (HKCU: this is a per-user install, HKLM would need admin)
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayIcon" "$INSTDIR\64\launchbro.exe"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "Publisher" "ctnkyaumt"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${APP_VERSION}"
 SectionEnd
 
 Section "Uninstall"
@@ -82,6 +87,6 @@ KeepProfiles:
     ; bin and profile folders remain
 
 CleanupRegistry:
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 SectionEnd
 
