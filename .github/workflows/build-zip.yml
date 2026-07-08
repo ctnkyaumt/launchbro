@@ -37,6 +37,12 @@ jobs:
           $c = $c -replace '(#define\s+APP_VERSION_RES\s+)[0-9, ]+', ('${1}' + $res)
           Set-Content -LiteralPath $apph -Value $c -Encoding utf8
           Copy-Item -Force CHANGELOG.md bin\History.txt
+
+          $nsi = 'installer.nsi'
+          $n = Get-Content -LiteralPath $nsi -Raw
+          $n = $n -replace '(!define\s+APP_VERSION\s+")[^"]*(")', ('${1}' + $ver + '${2}')
+          Set-Content -LiteralPath $nsi -Value $n -Encoding utf8
+
           Write-Host "Version set to $ver ($res)"
 
       - name: Build Release x64

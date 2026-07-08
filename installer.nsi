@@ -5,7 +5,7 @@
 !include "LogicLib.nsh"
 
 !define APP_NAME "launchbro"
-!define APP_VERSION "2.7"
+!define APP_VERSION "2.9.10"
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "launchbro-setup.exe"
@@ -50,7 +50,9 @@ SectionEnd
 
 Section "Uninstall"
     ; Close launchbro / chrlauncher and bundled browser processes from this install root
-    ExecWait "$\"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe$\" -NoProfile -ExecutionPolicy Bypass -Command $\"$\$roots=@($\'$INSTDIR$\');$\$legacy=Join-Path ([System.IO.Path]::GetDirectoryName($\'$INSTDIR$\')) $\'chrlauncher$\';if(Test-Path $\$legacy){$\$roots+=$\$legacy};Get-CimInstance Win32_Process | Where-Object { $\$path=$\$_.ExecutablePath; $\$path -and @($\$roots | Where-Object { $\$path.StartsWith($\$_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $\$_.ProcessId -Force -ErrorAction SilentlyContinue }$\""
+    ; (hidden window, broad error suppression - this used to flash a visible PowerShell
+    ; console with red WMI/CIM error text since only Stop-Process had -ErrorAction set)
+    ExecWait "$\"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe$\" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command $\"$\$ErrorActionPreference=$\'SilentlyContinue$\';$\$roots=@($\'$INSTDIR$\');$\$legacy=Join-Path ([System.IO.Path]::GetDirectoryName($\'$INSTDIR$\')) $\'chrlauncher$\';if(Test-Path $\$legacy){$\$roots+=$\$legacy};Get-CimInstance Win32_Process | Where-Object { $\$path=$\$_.ExecutablePath; $\$path -and @($\$roots | Where-Object { $\$path.StartsWith($\$_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 } | ForEach-Object { Stop-Process -Id $\$_.ProcessId -Force -ErrorAction SilentlyContinue }$\""
 
     ; Remove shortcuts
     Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"

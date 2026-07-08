@@ -86,7 +86,13 @@ jobs:
           $c = $c -replace '(#define\s+APP_VERSION\s+L")[^"]*(")', ('${1}' + $ver + '${2}')
           $c = $c -replace '(#define\s+APP_VERSION_RES\s+)[0-9, ]+', ('${1}' + $res)
           Set-Content -LiteralPath $apph -Value $c -Encoding utf8
-          Write-Host "app.h version set to $ver ($res)"
+
+          $nsi = 'installer.nsi'
+          $n = Get-Content -LiteralPath $nsi -Raw
+          $n = $n -replace '(!define\s+APP_VERSION\s+")[^"]*(")', ('${1}' + $ver + '${2}')
+          Set-Content -LiteralPath $nsi -Value $n -Encoding utf8
+
+          Write-Host "app.h / installer.nsi version set to $ver ($res)"
 
       - name: Build Release x64
         run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
