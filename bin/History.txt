@@ -1,3 +1,32 @@
+v2.9.10 (8 July 2026)
+- fixed "Run at end" appearing to do nothing: ChromiumUpdateOnly's shipped/fallback default (true) contradicted its own documented default ("false -> update & start Chromium (default)"), so is_onlyupdate was TRUE on every normal launch and silently blocked every _app_openbrowser call gated on it, regardless of the Run at end setting. Default now matches the documentation (false); the /update command-line flag still forces update-only mode when explicitly requested.
+- fixed the scheduled auto-update task potentially leaving a browser closed after updating: the relaunch-with-previous-tabs step skipped reopening entirely when a browser instance's command-line args happened to be empty, instead of still relaunching it with --restore-last-session.
+- audited remaining "chrlauncher" references: all are intentional (migration detection and legacy-install cleanup, which must name the old folder to find it) - no stray branding left.
+
+v2.9.9 (8 July 2026)
+- fixed the "Chromium needs to run once to register as a browser" dialog reappearing on every single launch: it now asks (and does the launch-and-close registration dance) at most once. The common cause is that Windows' default browser was never actually set to Chromium via Settings - relaunching Chromium cannot fix that by itself, only the user can, so nagging every startup accomplished nothing. The silent, non-prompting registry patch still runs on every launch and self-applies automatically the moment the user does set Chromium as default.
+
+v2.9.8 (8 July 2026)
+- fixed default-browser links doing nothing (and the registry patch refusing to apply / re-prompting "run once") after the chrlauncher->launchbro migration: the http/https handler still pointed at the old chrlauncher chrome.exe path. launchbro now recognizes a stale reference to its own moved browser (same exe name, path no longer on disk), repoints the command to the current binary, and injects the profile. A real browser present on disk (e.g. Google Chrome) is never touched.
+
+v2.9.7 (8 July 2026)
+- update-check network failures (e.g. DNS error 12007 on startup before the connection is ready) are now logged instead of popping a blocking "Could not download update" dialog; the tray still notifies on the main flow
+
+v2.9.6 (8 July 2026)
+- fixed default browser links still not launching: the registry patch now edits HKEY_CLASSES_ROOT\{ProgId}\shell\open\command (and the per-user Classes override), matching the known-working manual fix, and DELETES any DelegateExecute value instead of writing an empty one (the empty value from 2.9.4 itself blocked activation; this repairs those machines on next run)
+- uninstall now removes the desktop shortcuts it created (they used to be left behind) and reverts the default-browser --user-data-dir edit so no stale profile path is left in the http/https handler
+- build-zip/release workflows now stamp the exe version from CHANGELOG.md automatically, so test builds no longer ship a stale version number
+
+v2.9.5 (8 July 2026)
+- fixed "Download update" button doing nothing when the browser was already installed and auto-download was off
+- fixed profile export/import scanning the wrong folder (missed the 32/64 arch subfolder), so nothing was ever exported
+- desktop shortcut is now created only on first install (and refreshed on update); added CreateShortcut and CreateShortcutOnUpdate options instead of regenerating it on every launch and on every update-check
+- surface a clear error and roll back when a downloaded package unpacks without producing the browser executable, instead of leaving an empty bin folder and a misleading "error while checking for updates"
+
+v2.9.4 (8 July 2026)
+- fixed default browser links not opening the custom profile on Windows 11 by clearing the Chromium DelegateExecute handler that overrode the patched command
+- re-apply the registry patch on machines where a previous build left DelegateExecute intact
+
 v2.9.3 (29 June 2026)
 - fixed registry tweak using --single-argument instead of -- for correct URL handling
 - fixed http://https// double-scheme issue when opening links via default browser
