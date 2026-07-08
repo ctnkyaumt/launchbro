@@ -1,3 +1,6 @@
+v2.9.8 (8 July 2026)
+- fixed default-browser links doing nothing (and the registry patch refusing to apply / re-prompting "run once") after the chrlauncher->launchbro migration: the http/https handler still pointed at the old chrlauncher chrome.exe path. launchbro now recognizes a stale reference to its own moved browser (same exe name, path no longer on disk), repoints the command to the current binary, and injects the profile. A real browser present on disk (e.g. Google Chrome) is never touched.
+
 v2.9.7 (8 July 2026)
 - update-check network failures (e.g. DNS error 12007 on startup before the connection is ready) are now logged instead of popping a blocking "Could not download update" dialog; the tray still notifies on the main flow
 

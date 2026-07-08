@@ -247,6 +247,41 @@ static BOOLEAN _app_command_targets_launchbro (
 	return (StrStrIW (command->buffer, L"launchbro.exe") != NULL);
 }
 
+// Pull the executable path out of a shell open command, handling the leading "quoted"
+// form ("C:\...\chrome.exe" --single-argument %1) and the bare form.
+static PR_STRING _app_extract_command_exe (
+	_In_ PR_STRING command
+)
+{
+	LPCWSTR start;
+	LPCWSTR end;
+
+	if (!command || _r_obj_isstringempty (command))
+		return NULL;
+
+	if (command->buffer[0] == L'"')
+	{
+		start = command->buffer + 1;
+		end = wcschr (start, L'"');
+
+		if (!end)
+			return NULL;
+	}
+	else
+	{
+		start = command->buffer;
+		end = start;
+
+		while (*end && *end != L' ' && *end != L'\t')
+			end++;
+	}
+
+	if (end == start)
+		return NULL;
+
+	return _r_obj_createstring_ex (start, (ULONG_PTR)(end - start) * sizeof (WCHAR));
+}
+
 static BOOLEAN _app_command_targets_selected_browser (
 	_In_ PBROWSER_INFORMATION pbi,
 	_In_ PR_STRING command
@@ -264,6 +299,85 @@ static BOOLEAN _app_command_targets_selected_browser (
 	return FALSE;
 }
 
+// After the chrlauncher->launchbro migration (or any move), the default-browser command can
+// still point at the old exe path, which no longer exists. Recognise that as a stale copy of
+// our own browser: the exe's file name matches ours AND the referenced path is gone from disk.
+// Requiring the path to be missing keeps us from ever hijacking a real, working browser (e.g.
+// Google Chrome, which is also chrome.exe but present on disk).
+static BOOLEAN _app_command_targets_stale_self (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ PR_STRING command
+)
+{
+	PR_STRING cmd_exe;
+	R_STRINGREF cmd_leaf;
+	R_STRINGREF our_leaf;
+	BOOLEAN is_stale = FALSE;
+
+	if (!pbi || _r_obj_isstringempty (pbi->binary_path) || !command || _r_obj_isstringempty (command))
+		return FALSE;
+
+	cmd_exe = _app_extract_command_exe (command);
+
+	if (!cmd_exe)
+		return FALSE;
+
+	_r_path_getpathinfo (&cmd_exe->sr, NULL, &cmd_leaf);
+	_r_path_getpathinfo (&pbi->binary_path->sr, NULL, &our_leaf);
+
+	if (_r_str_isequal (&cmd_leaf, &our_leaf, TRUE) && !_r_fs_exists (&cmd_exe->sr))
+		is_stale = TRUE;
+
+	_r_obj_dereference (cmd_exe);
+
+	return is_stale;
+}
+
+// Replace the executable in a shell open command with new_exe, keeping the arguments intact.
+static PR_STRING _app_replace_command_exe (
+	_In_ PR_STRING command,
+	_In_ PR_STRING new_exe
+)
+{
+	LPCWSTR rest;
+	PR_STRING quoted_exe;
+	PR_STRING result;
+	R_STRINGREF rest_sr;
+
+	if (!command || _r_obj_isstringempty (command) || !new_exe || _r_obj_isstringempty (new_exe))
+		return NULL;
+
+	if (command->buffer[0] == L'"')
+	{
+		rest = wcschr (command->buffer + 1, L'"');
+
+		if (!rest)
+			return NULL;
+
+		rest++; // skip the closing quote
+	}
+	else
+	{
+		rest = command->buffer;
+
+		while (*rest && *rest != L' ' && *rest != L'\t')
+			rest++;
+	}
+
+	quoted_exe = _r_format_string (L"\"%s\"", new_exe->buffer);
+
+	if (!quoted_exe)
+		return NULL;
+
+	_r_obj_initializestringref (&rest_sr, (LPWSTR)rest);
+
+	result = _r_obj_concatstringrefs (2, &quoted_exe->sr, &rest_sr);
+
+	_r_obj_dereference (quoted_exe);
+
+	return result;
+}
+
 static PR_STRING _app_build_profile_open_command (
 	_In_ PBROWSER_INFORMATION pbi,
 	_In_ PR_STRING command
@@ -271,6 +385,25 @@ static PR_STRING _app_build_profile_open_command (
 {
 	if (!pbi || _r_obj_isstringempty (pbi->binary_path))
 		return NULL;
+
+	// stale reference to our own (moved/renamed) browser: repoint the exe to the current
+	// binary, then inject the profile switch as usual. Fixes default-browser links after the
+	// chrlauncher->launchbro migration left the command pointing at a path that no longer exists.
+	if (!_app_command_targets_selected_browser (pbi, command) &&
+		_app_command_targets_stale_self (pbi, command))
+	{
+		PR_STRING repointed = _app_replace_command_exe (command, pbi->binary_path);
+		PR_STRING result;
+
+		if (!repointed)
+			return NULL;
+
+		result = _app_insert_profile_dir_in_command (repointed, pbi->profile_dir);
+
+		_r_obj_dereference (repointed);
+
+		return result;
+	}
 
 	if (!_app_command_targets_selected_browser (pbi, command))
 		return NULL;
