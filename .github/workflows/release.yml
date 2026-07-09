@@ -1,0 +1,184 @@
+name: release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Disable submodule recursion
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config --global fetch.recurseSubmodules false
+          git config --global submodule.recurse false
+
+      - name: Fetch routine dependency
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!(Test-Path ..\routine)) {
+            git clone --depth 1 https://github.com/henrypp/routine.git ..\routine
+          }
+
+      - name: Sync History with Changelog
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Copy-Item -Force CHANGELOG.md bin\History.txt
+          $diff = git diff --name-only bin/History.txt
+          if ($diff) {
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add bin/History.txt
+            git commit -m "chore: sync History.txt with CHANGELOG.md"
+            git push
+          }
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git -c fetch.recurseSubmodules=false fetch --tags --force --no-recurse-submodules
+
+          $historyPath = Join-Path $PWD 'bin\History.txt'
+          $latestHistoryVersion = $null
+          if (Test-Path $historyPath) {
+            $first = (Get-Content -LiteralPath $historyPath | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1)
+            if ($first -match '^v(?<ver>\d+\.\d+(?:\.\d+)?)\b') {
+              $latestHistoryVersion = $Matches['ver']
+            }
+          }
+
+          if (-not $latestHistoryVersion) { throw "Could not read latest version from bin/History.txt" }
+          $version = $latestHistoryVersion
+
+          $tag = "v$version"
+          $lastTag = (git tag --list "v*" --sort=-v:refname | Select-Object -First 1)
+          "last_tag=$lastTag" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build Release x64
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+
+      - name: Build Release Win32
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.version.outputs.version }}'
+          $zipName = "launchbro-$version-bin.zip"
+          $setupName = "launchbro-$version-setup.exe"
+
+          $binRoot = Join-Path $PWD 'bin'
+          if (!(Test-Path $binRoot)) { throw "Missing .\\bin output folder" }
+
+          New-Item -ItemType Directory -Force -Path .\dist\launchbro | Out-Null
+
+          $targets = @(
+            @{ Folder = '64'; Exe = 'launchbro.exe' },
+            @{ Folder = '32'; Exe = 'launchbro.exe' }
+          )
+
+          foreach ($t in $targets) {
+            $src = Join-Path $binRoot $t.Folder
+            if (Test-Path (Join-Path $src $t.Exe)) {
+              $dst = Join-Path $PWD ("dist\\launchbro\\" + $t.Folder)
+              New-Item -ItemType Directory -Force -Path $dst | Out-Null
+              Copy-Item -Recurse -Force -Path (Join-Path $src '*') -Destination $dst -Exclude *.pdb,*.ipdb,*.iobj
+            }
+          }
+
+          # Copy supporting files
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.ini') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.lng') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\History.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\License.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\Readme.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\RegistryCleaner.reg') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\SetDefaultBrowser.bat') -Destination .\dist\launchbro\ | Out-Null
+          xcopy /E /I /Y (Join-Path $PWD 'bin\i18n') .\dist\launchbro\i18n | Out-Null
+
+          if (!(Test-Path .\dist\launchbro\64\launchbro.exe) -and !(Test-Path .\dist\launchbro\32\launchbro.exe)) {
+            throw "No packaged outputs were found (expected dist\\launchbro\\{32,64}\\launchbro.exe)"
+          }
+
+          # Build NSIS installer
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsis) {
+            & $nsis /V3 "installer.nsi"
+            if (Test-Path "launchbro-setup.exe") {
+              Rename-Item -Path "launchbro-setup.exe" -NewName $setupName
+            }
+          } else {
+            Write-Warning "NSIS not found, skipping installer build"
+          }
+
+          Compress-Archive -Force -Path .\dist\launchbro -DestinationPath (Join-Path $PWD $zipName)
+          "zip=$zipName" >> $env:GITHUB_OUTPUT
+          "setup=$setupName" >> $env:GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $version = '${{ steps.version.outputs.version }}'
+          $historyPath = Join-Path $PWD 'bin\History.txt'
+          $out = Join-Path $PWD 'release-notes.md'
+
+          if (Test-Path $historyPath) {
+            $lines = Get-Content -LiteralPath $historyPath
+            $start = $null
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match ("^v" + [regex]::Escape($version) + "\b")) { $start = $i; break }
+            }
+
+            if ($null -ne $start) {
+              $body = @()
+              for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+                if ([string]::IsNullOrWhiteSpace($lines[$i])) { break }
+                $body += $lines[$i]
+              }
+
+              if ($body.Count -gt 0) {
+                Set-Content -LiteralPath $out -Value $body -Encoding utf8
+                "path=$out" >> $env:GITHUB_OUTPUT
+                exit 0
+              }
+            }
+          }
+          throw "Could not find v$version section in History.txt"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.ref_name }}
+          name: ${{ steps.version.outputs.version }}
+          body_path: ${{ steps.notes.outputs.path }}
+          files: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.setup }}
+

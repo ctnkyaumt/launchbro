@@ -1,0 +1,89 @@
+name: build-zip
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Fetch routine dependency
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!(Test-Path ..\routine)) {
+            git clone --depth 1 https://github.com/henrypp/routine.git ..\routine
+          }
+
+      - name: Build Release x64
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+
+      - name: Build Release Win32
+        run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $binRoot = Join-Path $PWD 'bin'
+          if (!(Test-Path $binRoot)) { throw "Missing .\\bin output folder" }
+
+          New-Item -ItemType Directory -Force -Path .\dist\launchbro | Out-Null
+
+          $targets = @(
+            @{ Folder = '64'; Exe = 'launchbro.exe' },
+            @{ Folder = '32'; Exe = 'launchbro.exe' }
+          )
+
+          foreach ($t in $targets) {
+            $src = Join-Path $binRoot $t.Folder
+            if (Test-Path (Join-Path $src $t.Exe)) {
+              $dst = Join-Path $PWD ("dist\\launchbro\\" + $t.Folder)
+              New-Item -ItemType Directory -Force -Path $dst | Out-Null
+              Copy-Item -Recurse -Force -Path (Join-Path $src '*') -Destination $dst -Exclude *.pdb,*.ipdb,*.iobj
+            }
+          }
+
+          # Copy supporting files
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.ini') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\launchbro.lng') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\History.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\License.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\Readme.txt') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\RegistryCleaner.reg') -Destination .\dist\launchbro\ | Out-Null
+          Copy-Item -Force -Path (Join-Path $PWD 'bin\SetDefaultBrowser.bat') -Destination .\dist\launchbro\ | Out-Null
+          xcopy /E /I /Y (Join-Path $PWD 'bin\i18n') .\dist\launchbro\i18n | Out-Null
+
+          if (!(Test-Path .\dist\launchbro\64\launchbro.exe) -and !(Test-Path .\dist\launchbro\32\launchbro.exe)) {
+            throw "No packaged outputs were found (expected dist\\launchbro\\{32,64}\\launchbro.exe)"
+          }
+
+          # Build NSIS installer
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsis) {
+            & $nsis /V3 "installer.nsi"
+          } else {
+            Write-Warning "NSIS not found, skipping installer build"
+          }
+
+          Compress-Archive -Force -Path .\dist\launchbro -DestinationPath .\launchbro-bin.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launchbro-bin.zip
+          path: launchbro-bin.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launchbro-setup.exe
+          path: launchbro-setup.exe
+

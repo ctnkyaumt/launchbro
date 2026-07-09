@@ -1,0 +1,34 @@
+; <language name>
+; <author information>
+
+[<locale name here>]
+IDS_FILE=File
+IDS_RUN=Start
+IDS_OPEN=Open
+IDS_EXIT=Exit
+IDS_SETTINGS=Settings
+IDS_LANGUAGE=Language
+IDS_HELP=Help
+IDS_WEBSITE=Website
+IDS_ABOUT=About
+IDS_DONATE=Give thanks!
+IDS_TRAY_SHOW=Show/Hide
+IDS_BROWSER=Name
+IDS_CURRENTVERSION=Current version
+IDS_VERSION=New version
+IDS_DATE=Build date
+IDS_ACTION_CHECK=Check for update
+IDS_ACTION_DOWNLOAD=Download update
+IDS_ACTION_INSTALL=Install update
+IDS_STATUS_CHECK=Checking for new releases...
+IDS_STATUS_DOWNLOAD=Downloading update...
+IDS_STATUS_INSTALL=Unpacking update...
+IDS_STATUS_FOUND=New version "%s" is available!
+IDS_STATUS_DOWNLOADED=An update has been downloaded, but not installed. Close Chromium and press 'Install update'.
+IDS_QUESTION_STOP=Are you sure you want to cancel the Chromium update process?
+IDS_CLOSE=Close
+IDS_STATUS_ERROR=Error while checking update...
+IDS_STATUS_NOTFOUND=<not found>
+IDS_RUNATEND_CHK=Start browser at end
+IDS_DARKMODE_CHK=Use dark theme
+

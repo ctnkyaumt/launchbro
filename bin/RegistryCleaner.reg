@@ -1,0 +1,14 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\Software\RegisteredApplications]
+"launchbro"=-
+
+[-HKEY_LOCAL_MACHINE\Software\Clients\StartMenuInternet\launchbro]
+[-HKEY_LOCAL_MACHINE\Software\Clients\StartMenuInternet\launchbro.EXE]
+
+[-HKEY_LOCAL_MACHINE\Software\Classes\launchbroHTML]
+[-HKEY_LOCAL_MACHINE\Software\Classes\launchbroURL]
+
+[-HKEY_CLASSES_ROOT\launchbroHTML]
+[-HKEY_CLASSES_ROOT\launchbroURL]
+
