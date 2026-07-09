@@ -344,15 +344,6 @@ VOID _app_thread_check (
 			_r_wnd_toggle (hwnd, TRUE);
 		}
 
-		if (is_exists)
-		{
-			if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
-			{
-				if (!pbi->is_waitdownloadend && !pbi->is_onlyupdate)
-					_app_openbrowser (pbi);
-			}
-		}
-
 		if (_app_checkupdate (hwnd, pbi, &is_haveerror))
 		{
 			_r_tray_toggle (hwnd, &GUID_TrayIcon, TRUE); // show tray icon
@@ -361,12 +352,6 @@ VOID _app_thread_check (
 			{
 				if (pbi->is_bringtofront)
 					_r_wnd_toggle (hwnd, TRUE); // show window
-
-				if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
-				{
-					if (is_exists && !pbi->is_onlyupdate && !pbi->is_waitdownloadend && !_app_isupdatedownloaded (pbi))
-						_app_openbrowser (pbi);
-				}
 
 				_r_progress_setmarquee (hwnd, IDC_PROGRESS, FALSE);
 
@@ -380,6 +365,7 @@ VOID _app_thread_check (
 						{
 							_app_set_lastcheck (pbi);
 							_app_maybe_create_shortcut (pbi, !was_installed);
+							is_installed = TRUE;
 						}
 					}
 					else
@@ -478,13 +464,20 @@ VOID _app_thread_check (
 			_app_ensure_registry_profile (hwnd, pbi);
 	}
 
-	// When is_waitdownloadend is set, opening the browser is deferred to WM_DESTROY (fired
-	// below when !is_stayopen) so we don't launch it while an update might still be
-	// downloading/installing. Without this guard, both this call AND the WM_DESTROY one would
-	// fire - the WM_DESTROY one arriving late (whenever the window actually closes, possibly
-	// much later if is_stayopen was set on an earlier run) and re-launching a second time.
-	if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE) && !pbi->is_onlyupdate && !pbi->is_waitdownloadend)
+	// The browser is launched here at the very end of the run, and never on window close
+	// (WM_DESTROY no longer launches it) or at the start, in exactly two cases:
+	//   - a URL was routed through launchbro.exe (default-browser handler) - open it now;
+	//   - "Run at end" is enabled AND we actually installed an update this run - i.e. launch
+	//     the freshly-updated browser once updating finished, not merely because the launcher
+	//     was opened. Day-to-day browsing goes through the Desktop shortcut (direct chrome.exe).
+	if (pbi->is_hasurls)
 		_app_openbrowser (pbi);
+	else if (is_installed && !pbi->is_onlyupdate && _r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
+		_app_openbrowser (pbi);
+
+	// A bare manual launch (no args) keeps its window open for the user instead of closing.
+	if (!pbi->is_hasargs)
+		is_stayopen = TRUE;
 
 	_r_queuedlock_releaseshared (&lock_thread);
 
@@ -716,27 +709,19 @@ INT_PTR CALLBACK DlgProc (
 
 			_r_taskbar_initialize (&browser_info.htaskbar);
 
-			// A bare launch (no CLI args at all - a plain double-click of the Start Menu
-			// shortcut) just shows the UI and waits for the user; it does not auto-check or
-			// auto-launch the browser, since that used to close the window before the user
-			// could ever see or use it. Any other invocation (the scheduled task's /taskupdate,
-			// a URL routed through launchbro.exe, /update, etc.) keeps running the check flow
-			// automatically as before - the day-to-day "just open the browser" path is the
-			// Desktop shortcut, which launches the browser directly and never goes through here.
-			if (browser_info.is_hasargs)
+			// Always check for updates on launch, including a bare manual double-click (no
+			// args). A manual launch additionally shows the window up front and keeps it open
+			// afterward (see _app_thread_check), and never auto-launches the browser except via
+			// "Run at end" once an update has actually been installed. The day-to-day "just open
+			// the browser" path is the Desktop shortcut, which launches the browser directly and
+			// never comes through here.
+			if (!browser_info.is_hasargs)
 			{
-				_r_workqueue_queueitem (&workqueue, &_app_thread_check, &browser_info);
-			}
-			else
-			{
-				_app_update_browser_info (hwnd, &browser_info);
-
-				_r_ctrl_setstring (hwnd, IDC_START_BTN, _r_locale_getstring (_app_getactionid (&browser_info)));
-				_r_ctrl_enable (hwnd, IDC_START_BTN, TRUE);
-
 				_r_tray_toggle (hwnd, &GUID_TrayIcon, TRUE);
 				_r_wnd_toggle (hwnd, TRUE);
 			}
+
+			_r_workqueue_queueitem (&workqueue, &_app_thread_check, &browser_info);
 
 			break;
 		}
@@ -876,11 +861,8 @@ INT_PTR CALLBACK DlgProc (
 				hicon_app_large = NULL;
 			}
 
-			if (_r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
-			{
-				if (browser_info.is_waitdownloadend && !browser_info.is_onlyupdate)
-					_app_openbrowser (&browser_info);
-			}
+			// Closing launchbro must NOT launch the browser. The browser is only ever launched
+			// at the end of an update run (see _app_thread_check), never on window close.
 
 			//_r_workqueue_waitforfinish (&workqueue);
 			//_r_workqueue_destroy (&workqueue);

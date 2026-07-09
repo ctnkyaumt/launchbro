@@ -231,6 +231,156 @@ static BOOLEAN _app_copy_directory (
 	return is_success;
 }
 
+// Does this folder look like an actual browser profile / user-data dir? Chromium user-data
+// dirs carry a "Local State" file and/or a "Default" subfolder; Firefox profiles carry
+// prefs.js / times.json. Used so import works no matter what the folder is named.
+static BOOLEAN _app_dir_is_profile (
+	_In_ LPCWSTR dir
+)
+{
+	static LPCWSTR markers[] = {L"Local State", L"Default", L"prefs.js", L"times.json"};
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (markers); i++)
+	{
+		PR_STRING probe = _r_format_string (L"%s\\%s", dir, markers[i]);
+		BOOLEAN is_hit = FALSE;
+
+		if (probe)
+		{
+			is_hit = _r_fs_exists (&probe->sr);
+			_r_obj_dereference (probe);
+		}
+
+		if (is_hit)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+// Given the folder the user picked in the import dialog, figure out the real profile folder to
+// copy from - whether they picked the profile folder itself (any name), or a parent that holds
+// it under a known name (the export format launchbro_profile{N}_{type}, launchbro_profile{N},
+// profile{N}, or a plain "profile"), or a parent that holds a single profile-looking subfolder.
+static PR_STRING _app_find_import_source (
+	_In_ PR_STRING import_dir,
+	_In_ LONG instance_id
+)
+{
+	PR_STRING candidate;
+	PR_STRING label;
+	PR_STRING search_path;
+	HANDLE hfind;
+	WIN32_FIND_DATAW find_data;
+
+	// 1. the picked folder is itself a profile
+	if (_app_dir_is_profile (import_dir->buffer))
+		return _r_obj_createstring (import_dir->buffer);
+
+	// 2. known subfolder names, most specific first
+	label = _app_get_profile_label (instance_id, NULL);
+
+	if (label)
+	{
+		candidate = _r_format_string (L"%s\\%s", import_dir->buffer, label->buffer);
+
+		_r_obj_dereference (label);
+
+		if (candidate)
+		{
+			if (_r_fs_exists (&candidate->sr))
+				return candidate;
+
+			_r_obj_dereference (candidate);
+		}
+	}
+
+	{
+		PR_STRING names[3];
+		ULONG_PTR count = 0;
+
+		names[count++] = _r_format_string (L"launchbro_profile%" TEXT (PR_LONG), instance_id);
+
+		if (instance_id <= 1)
+			names[count++] = _r_obj_createstring (L"profile");
+		else
+			names[count++] = _r_format_string (L"profile%" TEXT (PR_LONG), instance_id);
+
+		names[count++] = _r_obj_createstring (L"profile");
+
+		for (ULONG_PTR i = 0; i < count; i++)
+		{
+			candidate = NULL;
+
+			if (names[i])
+			{
+				candidate = _r_format_string (L"%s\\%s", import_dir->buffer, names[i]->buffer);
+				_r_obj_dereference (names[i]);
+			}
+
+			if (candidate)
+			{
+				if (_r_fs_exists (&candidate->sr))
+				{
+					// free any names we didn't get to
+					for (ULONG_PTR j = i + 1; j < count; j++)
+					{
+						if (names[j])
+							_r_obj_dereference (names[j]);
+					}
+
+					return candidate;
+				}
+
+				_r_obj_dereference (candidate);
+			}
+		}
+	}
+
+	// 3. last resort: a single subfolder that itself looks like a profile
+	search_path = _r_format_string (L"%s\\*", import_dir->buffer);
+
+	if (search_path)
+	{
+		hfind = FindFirstFileW (search_path->buffer, &find_data);
+
+		if (hfind != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+					continue;
+
+				if (_r_str_compare (find_data.cFileName, L".", 1) == 0 ||
+					_r_str_compare (find_data.cFileName, L"..", 2) == 0)
+					continue;
+
+				candidate = _r_format_string (L"%s\\%s", import_dir->buffer, find_data.cFileName);
+
+				if (candidate)
+				{
+					if (_app_dir_is_profile (candidate->buffer))
+					{
+						FindClose (hfind);
+						_r_obj_dereference (search_path);
+
+						return candidate;
+					}
+
+					_r_obj_dereference (candidate);
+				}
+			}
+			while (FindNextFileW (hfind, &find_data));
+
+			FindClose (hfind);
+		}
+
+		_r_obj_dereference (search_path);
+	}
+
+	return NULL;
+}
+
 VOID _app_export_profile (
 	_In_ HWND hwnd
 )
@@ -369,6 +519,22 @@ VOID _app_import_profile (
 		}
 	}
 
+	// Locate the real profile folder from whatever the user picked (the profile itself under
+	// any name, or a parent holding it). This is the fix for import silently doing nothing when
+	// the folder wasn't named exactly as the old code expected.
+	import_subdir = _app_find_import_source (import_dir, instance_id);
+
+	if (!import_subdir)
+	{
+		_r_show_message (hwnd, MB_OK | MB_ICONWARNING, NULL,
+			L"No browser profile was found in the selected folder.\r\n\r\n"
+			L"Pick the profile folder itself, or a folder that directly contains it.");
+
+		_r_obj_dereference (import_dir);
+		_r_obj_dereference (app_root);
+		return;
+	}
+
 	if (instance_id == 1)
 		profile_dir = _r_format_string (L"%s\\profile", app_root->buffer);
 	else
@@ -383,6 +549,7 @@ VOID _app_import_profile (
 				L"Target profile already exists. Overwrite?") != IDYES)
 			{
 				_r_obj_dereference (profile_dir);
+				_r_obj_dereference (import_subdir);
 				_r_obj_dereference (import_dir);
 				_r_obj_dereference (app_root);
 				return;
@@ -391,34 +558,13 @@ VOID _app_import_profile (
 
 		_r_fs_createdirectory (&profile_dir->sr);
 
-		import_subdir = _r_format_string (L"%s\\launchbro_profile%" TEXT (PR_LONG), import_dir->buffer, instance_id);
-
-		if (!import_subdir || !_r_fs_exists (&import_subdir->sr))
-		{
-			// Try generic profile folder name
-			if (import_subdir)
-				_r_obj_dereference (import_subdir);
-
-			import_subdir = _r_format_string (L"%s\\profile%" TEXT (PR_LONG), import_dir->buffer, instance_id);
-		}
-
-		if (!import_subdir || !_r_fs_exists (&import_subdir->sr))
-		{
-			if (import_subdir)
-				_r_obj_dereference (import_subdir);
-
-			import_subdir = _r_format_string (L"%s\\profile", import_dir->buffer);
-		}
-
-		if (import_subdir && _r_fs_exists (&import_subdir->sr))
-		{
-			_app_copy_directory (import_subdir, profile_dir);
-			any_imported = TRUE;
-			_r_obj_dereference (import_subdir);
-		}
+		_app_copy_directory (import_subdir, profile_dir);
+		any_imported = TRUE;
 
 		_r_obj_dereference (profile_dir);
 	}
+
+	_r_obj_dereference (import_subdir);
 
 	if (any_imported)
 		_r_show_message (hwnd, MB_OK | MB_ICONINFORMATION, NULL, _r_locale_getstring (IDS_PROFILE_IMPORTED));
