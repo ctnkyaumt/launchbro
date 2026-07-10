@@ -21,6 +21,9 @@
     <ClCompile Include="src\shortcut.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\shortcut_aumid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\taskupdate.c">
       <Filter>Source Files</Filter>
     </ClCompile>

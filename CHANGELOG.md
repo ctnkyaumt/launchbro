@@ -1,6 +1,6 @@
 v2.9.10 (8 July 2026)
 - fixed "Run at end" not launching the browser, and the browser sometimes launching unexpectedly (a second time on exit, or before launchbro's own window could be used) - browser launching is now reliably tied to "Run at end" + an update actually being installed, never to startup or window close.
-- fixed the taskbar showing two separate icons instead of unifying a pinned shortcut with the running browser.
+- fixed the taskbar still showing two separate icons on Windows 11: unifying a pin with the running browser needs the shortcut to carry the exact same AppUserModelID as the live window, so launchbro now reads that ID back from the browser's window after launch and stamps it onto the desktop shortcut, rather than relying on both sides falling back to the same unset default.
 - fixed a browser instance sometimes not reopening after a scheduled auto-update.
 - fixed setup.exe installing to Program Files, which silently broke self-updating (launchbro runs unelevated and needs write access to its own folder); it now installs per-user under Documents.
 - fixed the uninstaller showing the wrong version number and briefly flashing a PowerShell window.

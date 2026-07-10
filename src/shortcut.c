@@ -9,22 +9,21 @@
 #include <shlobj.h>
 #include <shobjidl.h>
 
-// Deliberately do NOT stamp a custom PKEY_AppUserModel_ID on this shortcut. Windows only
-// unifies a taskbar pin with a running window's taskbar button when both carry the same
-// AppUserModelID, and a custom one here is only ever visible to Windows when the shortcut is
-// what launches the browser - clicking a PINNED copy of this .lnk launches chrome.exe directly
-// (Explorer never goes through launchbro.exe), so nothing on our side can also stamp a matching
-// ID onto that resulting window. Leaving the shortcut's AppUserModelID unset means both the pin
-// and any window opened from this exact binary_path fall back to Windows' own default (which is
-// derived from the target path), so they agree no matter how the browser was actually launched.
-// Each instance already lives in its own bin/bin2/bin3/bin4 folder, so that path-based default
-// still keeps separate profile instances visually distinct in the taskbar.
+// The shortcut itself is created here without an explicit PKEY_AppUserModel_ID.
+// On Windows 10, the implicit path-based default was enough for taskbar unification.
+// On Windows 11, the taskbar is stricter: the shortcut's AUMID must exactly match
+// the running process's explicit AUMID. To handle this, _app_try_stamp_shortcut_aumid
+// (in shortcut_aumid.c) runs after the browser launches, queries the browser window's
+// AUMID via SHGetPropertyStoreForWindow, and stamps it onto this shortcut file.
+
+PR_STRING _app_get_shortcut_path (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
 VOID _app_create_profileshortcut (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {
-	PWSTR desktop_path = NULL;
-	PR_STRING link_title = NULL;
 	PR_STRING link_path = NULL;
 	HRESULT hr_init;
 	HRESULT hr;
@@ -54,31 +53,10 @@ VOID _app_create_profileshortcut (
 		_r_fs_createdirectory (&pbi->profile_dir->sr);
 	}
 
-	hr = SHGetKnownFolderPath (&FOLDERID_Desktop, KF_FLAG_DEFAULT, NULL, &desktop_path);
-
-	if (FAILED (hr) || !desktop_path)
-		return;
-
-	if (pbi->instance_id <= 1)
-		link_title = _r_format_string (L"%s (%" TEXT (PR_LONG) L"-bit)", _r_obj_getstring (pbi->browser_type), pbi->architecture);
-	else
-		link_title = _r_format_string (L"%s (%" TEXT (PR_LONG) L"-bit) #%" TEXT (PR_LONG), _r_obj_getstring (pbi->browser_type), pbi->architecture, pbi->instance_id);
-
-	if (!link_title)
-	{
-		CoTaskMemFree (desktop_path);
-		return;
-	}
-
-	link_path = _r_format_string (L"%s\\%s.lnk", desktop_path, link_title->buffer);
-
-	CoTaskMemFree (desktop_path);
+	link_path = _app_get_shortcut_path (pbi);
 
 	if (!link_path)
-	{
-		_r_obj_dereference (link_title);
 		return;
-	}
 
 	hr_init = CoInitializeEx (NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
@@ -86,6 +64,13 @@ VOID _app_create_profileshortcut (
 
 	if (SUCCEEDED (hr) && psl)
 	{
+		PR_STRING link_title;
+
+		if (pbi->instance_id <= 1)
+			link_title = _r_format_string (L"%s (%" TEXT (PR_LONG) L"-bit)", _r_obj_getstring (pbi->browser_type), pbi->architecture);
+		else
+			link_title = _r_format_string (L"%s (%" TEXT (PR_LONG) L"-bit) #%" TEXT (PR_LONG), _r_obj_getstring (pbi->browser_type), pbi->architecture, pbi->instance_id);
+
 		psl->lpVtbl->SetPath (psl, pbi->binary_path->buffer);
 
 		if (!_r_obj_isstringempty (pbi->binary_dir))
@@ -95,7 +80,12 @@ VOID _app_create_profileshortcut (
 			psl->lpVtbl->SetArguments (psl, pbi->args_str->buffer);
 
 		psl->lpVtbl->SetIconLocation (psl, pbi->binary_path->buffer, 0);
-		psl->lpVtbl->SetDescription (psl, link_title->buffer);
+
+		if (link_title)
+		{
+			psl->lpVtbl->SetDescription (psl, link_title->buffer);
+			_r_obj_dereference (link_title);
+		}
 
 		hr = psl->lpVtbl->QueryInterface (psl, &IID_IPersistFile, (PVOID_PTR)&ppf);
 
@@ -111,7 +101,6 @@ VOID _app_create_profileshortcut (
 	if (SUCCEEDED (hr_init))
 		CoUninitialize ();
 
-	_r_obj_dereference (link_title);
 	_r_obj_dereference (link_path);
 }
 

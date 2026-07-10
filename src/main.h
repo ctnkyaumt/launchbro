@@ -74,6 +74,10 @@ VOID _app_maybe_create_shortcut (
 	_In_ BOOLEAN is_firstinstall
 );
 
+VOID _app_try_stamp_shortcut_aumid (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
 BOOLEAN _app_is_registry_patched (
 	_In_ PBROWSER_INFORMATION pbi
 );

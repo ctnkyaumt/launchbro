@@ -475,6 +475,12 @@ VOID _app_thread_check (
 	else if (is_installed && !pbi->is_onlyupdate && _r_config_getboolean (L"ChromiumRunAtEnd", TRUE))
 		_app_openbrowser (pbi);
 
+	// After the browser has been launched, stamp its AUMID onto the desktop shortcut
+	// so that Windows 11's taskbar correctly unifies the pinned icon with the running
+	// browser window.
+	if (is_installed)
+		_app_try_stamp_shortcut_aumid (pbi);
+
 	// A bare manual launch (no args) keeps its window open for the user instead of closing.
 	if (!pbi->is_hasargs)
 		is_stayopen = TRUE;

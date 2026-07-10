@@ -293,6 +293,23 @@ VOID _app_thread_taskupdate_all (
 		}
 	}
 
+	// After all browsers have been relaunched, stamp each instance's AUMID onto its
+	// desktop shortcut for Windows 11 taskbar unification.
+	for (LONG instance_id = 1; instance_id <= 4; instance_id++)
+	{
+		PBROWSER_INFORMATION pbi_stamp = NULL;
+
+		if (!_app_is_instance_configured (instance_id))
+			continue;
+
+		if (primary->instance_id == instance_id)
+			pbi_stamp = primary;
+		else
+			pbi_stamp = &instances[instance_id - 1];
+
+		_app_try_stamp_shortcut_aumid (pbi_stamp);
+	}
+
 	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (instances); i++)
 		_app_clear_browser_info_references (&instances[i]);
 
