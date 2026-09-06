@@ -9,5 +9,15 @@ New-Item -ItemType Directory -Force $testDir | Out-Null
 $testSource = Join-Path $PSScriptRoot 'update_release_test.c'
 $testExe = Join-Path $testDir 'update_release_test.exe'
 $testObj = Join-Path $testDir 'update_release_test.obj'
-& cmd.exe /d /c "`"`"$vcvars`" >nul && cl /nologo /W4 /WX /TC `"$testSource`" /Fo`"$testObj`" /Fe`"$testExe`" && `"$testExe`"`""
+$testBatch = Join-Path $testDir 'run.cmd'
+@(
+    '@echo off'
+    ('call "{0}" >nul' -f $vcvars)
+    'if errorlevel 1 exit /b 1'
+    ('cl /nologo /W4 /WX /TC "{0}" /Fo"{1}" /Fe"{2}"' -f $testSource, $testObj, $testExe)
+    'if errorlevel 1 exit /b 1'
+    ('"{0}"' -f $testExe)
+    'exit /b %errorlevel%'
+) | Set-Content -LiteralPath $testBatch -Encoding ascii
+& cmd.exe /d /c $testBatch
 if ($LASTEXITCODE) { throw "Release regression tests failed: $LASTEXITCODE" }
