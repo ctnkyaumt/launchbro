@@ -7,6 +7,7 @@
 #include "rapp.h"
 
 #include "resource.h"
+#include "update_release.h"
 
 extern R_QUEUED_LOCK lock_download;
 
@@ -128,57 +129,12 @@ static PR_STRING _app_json_find_string_value (
 	return _app_json_read_string (value_ptr);
 }
 
-static BOOLEAN _app_wcs_endswith (
-	_In_ LPCWSTR string,
-	_In_ LPCWSTR suffix
-)
-{
-	SIZE_T string_len;
-	SIZE_T suffix_len;
-
-	if (!string || !suffix)
-		return FALSE;
-
-	string_len = wcslen (string);
-	suffix_len = wcslen (suffix);
-
-	if (suffix_len == 0 || string_len < suffix_len)
-		return FALSE;
-
-	return _wcsicmp (string + (string_len - suffix_len), suffix) == 0;
-}
-
-static BOOLEAN _app_wcs_contains_i (
-	_In_ LPCWSTR haystack,
-	_In_ LPCWSTR needle
-)
-{
-	SIZE_T hay_len;
-	SIZE_T needle_len;
-
-	if (!haystack || !needle || !needle[0])
-		return FALSE;
-
-	hay_len = wcslen (haystack);
-	needle_len = wcslen (needle);
-
-	if (hay_len < needle_len)
-		return FALSE;
-
-	for (SIZE_T i = 0; i + needle_len <= hay_len; i++)
-	{
-		if (_wcsnicmp (haystack + i, needle, needle_len) == 0)
-			return TRUE;
-	}
-
-	return FALSE;
-}
-
 static BOOLEAN _app_checkupdate_github_latest_release (
 	_In_ HWND hwnd,
 	_In_ PBROWSER_INFORMATION pbi,
 	_In_ LPCWSTR release_api_url,
 	_In_ BOOLEAN is_exists,
+	_In_ BOOLEAN is_ungoogled,
 	_Out_ PBOOLEAN is_error_ptr
 )
 {
@@ -200,6 +156,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 	if (!hsession)
 	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", GetLastError (), release_api_url);
 		*is_error_ptr = TRUE;
 		goto CleanupExit;
 	}
@@ -214,7 +171,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 	if (status != STATUS_SUCCESS)
 	{
-		_r_show_errormessage (hwnd, NULL, status, L"Could not download update.", ET_WINHTTP);
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", status, release_api_url);
 		*is_error_ptr = TRUE;
 		_r_inet_destroydownload (&download_info);
 		goto CleanupExit;
@@ -253,6 +210,21 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	}
 
 	assets_ptr = wcsstr (json->buffer, L"\"assets\"");
+
+	if (is_ungoogled)
+	{
+		SIZE_T version_length = _app_release_chromium_version_length (tag_name->buffer);
+
+		if (!version_length)
+		{
+			_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_INVALID_DATA, release_api_url);
+			*is_error_ptr = TRUE;
+			goto CleanupExit;
+		}
+
+		tag_name->length = version_length * sizeof (WCHAR);
+		tag_name->buffer[version_length] = UNICODE_NULL;
+	}
 
 	if (!assets_ptr)
 	{
@@ -305,33 +277,10 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 				continue;
 			}
 
-			if (_app_wcs_endswith (asset_name->buffer, L".zip"))
-				score += 10;
-			else if (_app_wcs_endswith (asset_name->buffer, L".7z"))
-				score += 9;
-			else
+			score = _app_release_asset_score (asset_name->buffer, pbi->architecture, is_ungoogled);
+
+			if (wcsncmp (asset_url->buffer, L"https://github.com/", 19) != 0)
 				score = -1;
-
-			if (score >= 0)
-			{
-				if (pbi->architecture == 64)
-				{
-					if (_app_wcs_contains_i (asset_name->buffer, L"win64") || _app_wcs_contains_i (asset_name->buffer, L"x64"))
-						score += 6;
-					else if (_app_wcs_contains_i (asset_name->buffer, L"64"))
-						score += 5;
-				}
-				else if (pbi->architecture == 32)
-				{
-					if (_app_wcs_contains_i (asset_name->buffer, L"win32") || _app_wcs_contains_i (asset_name->buffer, L"x86"))
-						score += 6;
-					else if (_app_wcs_contains_i (asset_name->buffer, L"32"))
-						score += 5;
-				}
-
-				if (_app_wcs_contains_i (asset_name->buffer, L"portable"))
-					score += 2;
-			}
 
 			if (score > best_score)
 			{
@@ -355,7 +304,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 	if (!selected_url)
 	{
-		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_NOT_FOUND, L"No compatible portable browser archive in GitHub release");
 		*is_error_ptr = TRUE;
 		goto CleanupExit;
 	}
@@ -380,6 +329,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	}
 
 CleanupExit:
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
 
 	if (selected_url)
 		_r_obj_dereference (selected_url);
@@ -438,17 +388,21 @@ BOOLEAN _app_checkupdate (
 		R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
 		R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
 		R_STRINGREF cromite_type = PR_STRINGREF_INIT (L"cromite");
+		R_STRINGREF ungoogled_type = PR_STRINGREF_INIT (L"ungoogled-chromium");
 
 		if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE))
-			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/Eclipse-Community/r3dfox/releases/latest", is_exists, is_error_ptr);
+			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/Eclipse-Community/r3dfox/releases/latest", is_exists, FALSE, is_error_ptr);
 
 		if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE))
-			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/adonais/iceweasel/releases/latest", is_exists, is_error_ptr);
+			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/adonais/iceweasel/releases/latest", is_exists, FALSE, is_error_ptr);
 
 		update_url = _r_config_getstring (L"ChromiumUpdateUrl", NULL);
 
 		if (!update_url)
 		{
+			if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &ungoogled_type, TRUE))
+				return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_UNGOOGLED, is_exists, TRUE, is_error_ptr);
+
 			if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &cromite_type, TRUE))
 				update_url = _r_obj_createstring (CHROMIUM_UPDATE_URL_CROMITE);
 			else
@@ -479,7 +433,7 @@ BOOLEAN _app_checkupdate (
 					if (_r_obj_isstringempty (string))
 					{
 						// non-fatal: server returned no config; caller surfaces a tray notification
-						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", 0, L"Update configuration was not found");
+						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_INVALID_DATA, url->buffer);
 
 						*is_error_ptr = TRUE;
 					}
@@ -492,7 +446,7 @@ BOOLEAN _app_checkupdate (
 				{
 					// transient network/DNS failures (e.g. 12007) happen on startup before the
 					// connection is ready - log instead of blocking the user with a modal dialog
-					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", status, L"Could not download update");
+					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", status, url->buffer);
 
 					*is_error_ptr = TRUE;
 				}
@@ -500,6 +454,11 @@ BOOLEAN _app_checkupdate (
 				_r_inet_destroydownload (&download_info);
 
 				_r_inet_close (hsession);
+			}
+			else
+			{
+				_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", GetLastError (), url->buffer);
+				*is_error_ptr = TRUE;
 			}
 
 			if (proxy_string)
@@ -535,6 +494,17 @@ BOOLEAN _app_checkupdate (
 		}
 
 		_app_update_browser_info (hwnd, pbi);
+
+		if (!_app_ishaveupdate (pbi))
+		{
+			_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_INVALID_DATA, L"Update configuration must contain download and version");
+			SAFE_DELETE_REFERENCE (pbi->download_url);
+			SAFE_DELETE_REFERENCE (pbi->new_version);
+			*is_error_ptr = TRUE;
+			_r_obj_dereference (hashtable);
+			_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
+			return FALSE;
+		}
 
 		if (pbi->new_version && pbi->current_version)
 			is_newversion = (_r_str_versioncompare (&pbi->current_version->sr, &pbi->new_version->sr) == -1);
@@ -594,6 +564,12 @@ BOOLEAN _app_downloadupdate (
 	if (_app_isupdatedownloaded (pbi))
 		return TRUE;
 
+	if (_r_obj_isstringempty (pbi->download_url))
+	{
+		*is_error_ptr = TRUE;
+		return FALSE;
+	}
+
 	temp_file = _r_obj_concatstrings (
 		2,
 		pbi->cache_path->buffer,
@@ -642,9 +618,18 @@ BOOLEAN _app_downloadupdate (
 
 			if (status == STATUS_SUCCESS)
 			{
-				SAFE_DELETE_REFERENCE (pbi->download_url);
+				status = _r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
 
-				_r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
+				if (!NT_SUCCESS (status))
+				{
+					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_downloadupdate", status, pbi->cache_path->buffer);
+					_r_show_errormessage (hwnd, NULL, status, pbi->cache_path->buffer, ET_NATIVE);
+					*is_error_ptr = TRUE;
+					_r_fs_deletefile (&temp_file->sr, NULL);
+					break;
+				}
+
+				SAFE_DELETE_REFERENCE (pbi->download_url);
 
 				is_success = TRUE;
 				_r_fs_deletefile (&temp_file->sr, NULL);
@@ -669,6 +654,11 @@ BOOLEAN _app_downloadupdate (
 		}
 
 		_r_inet_close (hsession);
+	}
+	else
+	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_downloadupdate", GetLastError (), pbi->download_url->buffer);
+		*is_error_ptr = TRUE;
 	}
 
 	_r_queuedlock_releaseshared (&lock_download);

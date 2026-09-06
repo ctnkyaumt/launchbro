@@ -12,6 +12,10 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      - name: Test release asset selection
+        shell: pwsh
+        run: ./tests/run.ps1
+
       - name: Install NSIS
         run: choco install nsis -y
 
