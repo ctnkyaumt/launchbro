@@ -12,6 +12,10 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      - name: Test release asset selection
+        shell: pwsh
+        run: ./tests/run.ps1
+
       - name: Install NSIS
         run: choco install nsis -y
 
@@ -50,6 +54,14 @@ jobs:
 
       - name: Build Release Win32
         run: msbuild .\launchbro.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143
+
+      - name: Test first-run download and extraction
+        shell: pwsh
+        run: |
+          python tests/smoke_install.py bin/64/launchbro.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/smoke_install.py bin/32/launchbro.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Package
         shell: pwsh

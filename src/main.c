@@ -395,7 +395,7 @@ VOID _app_thread_check (
 				}
 			}
 
-			if (!pbi->is_autodownload && !_app_isupdatedownloaded (pbi))
+			if (!is_installed && !is_haveerror && !pbi->is_autodownload && !_app_isupdatedownloaded (pbi))
 			{
 				_r_tray_popupformat (hwnd, &GUID_TrayIcon, NIIF_INFO, _r_app_getname (), _r_locale_getstring (IDS_STATUS_FOUND), pbi->new_version->buffer); // just inform user
 

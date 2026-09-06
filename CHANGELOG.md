@@ -1,3 +1,10 @@
+v2.9.11 (6 September 2026)
+- fixed first-run ungoogled-chromium installation failing when the Woolyss metadata service blocks or redirects requests; default updates now use upstream GitHub Windows releases, preserving custom update URLs.
+- select only compatible portable browser archives and normalize Chromium package tags to the installed file version.
+- report metadata/session/cache-save failures correctly and include failing update URLs in diagnostic logs.
+- fixed root-level browser archives reading outside the filename buffer and a misleading update notification after successful installation.
+- added release asset/version regression checks to Windows build and release workflows.
+
 v2.9.10 (8 July 2026)
 - fixed "Run at end" not launching the browser, and the browser sometimes launching unexpectedly (a second time on exit, or before launchbro's own window could be used) - browser launching is now reliably tied to "Run at end" + an update actually being installed, never to startup or window close.
 - fixed the taskbar still showing two separate icons on Windows 11: unifying a pin with the running browser needs the shortcut to carry the exact same AppUserModelID as the live window, so launchbro now reads that ID back from the browser's window after launch and stamps it onto the desktop shortcut, rather than relying on both sides falling back to the same unset default.

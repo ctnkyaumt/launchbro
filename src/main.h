@@ -18,6 +18,7 @@ DEFINE_GUID (GUID_TrayIcon, 0xEAD41630, 0x90BB, 0x4836, 0x82, 0x41, 0xAE, 0xAE, 
 
 #define CHROMIUM_UPDATE_URL L"https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string"
 #define CHROMIUM_UPDATE_URL_CROMITE L"https://github.com/uazo/cromite/releases/latest/download/updateurl.txt"
+#define CHROMIUM_UPDATE_URL_UNGOOGLED L"https://api.github.com/repos/ungoogled-software/ungoogled-chromium-windows/releases/latest"
 
 #define CHROMIUM_TYPE L"ungoogled-chromium"
 #define CHROMIUM_COMMAND_LINE L"--flag-switches-begin --user-data-dir=..\\profile --no-default-browser-check --disable-logging --no-report-upload --flag-switches-end"

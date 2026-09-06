@@ -143,7 +143,7 @@ SRes _app_unpack_7zip (
 
 			length = path.length - bin_name->length - separator_sr.length;
 
-			if (_r_str_isendsswith (&path, bin_name, TRUE) && path.buffer[length / sizeof (WCHAR)] == OBJ_NAME_PATH_SEPARATOR)
+			if (path.length > bin_name->length && _r_str_isendsswith (&path, bin_name, TRUE) && path.buffer[length / sizeof (WCHAR)] == OBJ_NAME_PATH_SEPARATOR)
 			{
 				_r_obj_movereference ((PVOID_PTR)&root_dir_name, _r_obj_createstring_ex (path.buffer, path.length - bin_name->length));
 
@@ -329,7 +329,7 @@ BOOLEAN _app_unpack_zip (
 
 			length = path->length - bin_name->length - separator_sr.length;
 
-			if (_r_str_isendsswith (&path->sr, bin_name, TRUE) && path->buffer[length / sizeof (WCHAR)] == OBJ_NAME_PATH_SEPARATOR)
+			if (path->length > bin_name->length && _r_str_isendsswith (&path->sr, bin_name, TRUE) && path->buffer[length / sizeof (WCHAR)] == OBJ_NAME_PATH_SEPARATOR)
 			{
 				_r_obj_movereference ((PVOID_PTR)&root_dir_name, _r_obj_createstring_ex (path->buffer, path->length - bin_name->length));
 

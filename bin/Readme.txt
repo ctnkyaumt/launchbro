@@ -26,7 +26,9 @@ Supported browser:
 Settings:
 [launchbro]
 
-# Custom Chromium update URL (string):
+# Custom Chromium update URL (semicolon-separated download/version metadata):
+# By default, ungoogled-chromium uses upstream GitHub Windows releases.
+# An explicit URL overrides that source; other Chromium types retain their defaults.
 #ChromiumUpdateUrl=https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string
 #ChromiumUpdateUrl=https://github.com/uazo/cromite/releases/latest/download/updateurl.txt
 
@@ -49,6 +51,7 @@ ChromiumDirectory=.\bin
 ChromiumArchitecture=0
 
 # Auto download updates if found (boolean)
+# A missing browser is always downloaded on first launch, even when false.
 #
 # false	-> show tray tip if update found, downloading manually (default)
 # true	-> auto download update and install it!
@@ -97,7 +100,7 @@ ChromiumUpdateOnly=true
 #
 # ungoogled-chromium
 #	Unofficial builds without Google integration and enhanced privacy (based on Eloston project)
-#	"github.com/macchrome/winchrome/releases/" (32/64 bit)
+#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32/64 bit)
 #	"github.com/Eloston/ungoogled-chromium"
 #
 # cromite

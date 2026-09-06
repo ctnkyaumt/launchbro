@@ -60,7 +60,9 @@ There is list of arguments overrides .ini options
 ~~~ini
 [launchbro]
 
-# Custom Chromium update URL (string):
+# Custom Chromium update URL (semicolon-separated download/version metadata):
+# By default, ungoogled-chromium uses upstream GitHub Windows releases.
+# An explicit URL overrides that source; other Chromium types retain their defaults.
 #ChromiumUpdateUrl=https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string
 #ChromiumUpdateUrl=https://github.com/uazo/cromite/releases/latest/download/updateurl.txt
 
@@ -91,6 +93,7 @@ ChromiumDirectory=.\bin
 ChromiumArchitecture=0
 
 # Auto download updates if found (boolean)
+# A missing browser is always downloaded on first launch, even when false.
 #
 # false	-> show tray tip if update found, downloading manually (default)
 # true	-> auto download update and install it!
@@ -139,7 +142,7 @@ ChromiumUpdateOnly=true
 #
 # ungoogled-chromium
 #	Unofficial builds without Google integration and enhanced privacy (based on Eloston project)
-#	"github.com/macchrome/winchrome/releases/" (32/64 bit)
+#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32/64 bit)
 #	"github.com/Eloston/ungoogled-chromium"
 #
 # cromite
@@ -187,3 +190,8 @@ ChromiumDeleteToRecycle=true
 # Set proxy configuration (string):
 #Proxy=127.0.0.1:80
 ~~~
+
+### Building and testing:
+Build with Visual Studio C++ and the Windows SDK. Clone `henrypp/routine` beside this repository, then build `launchbro.vcxproj` (VS 2022: `/p:PlatformToolset=v143`). Run `powershell -File tests/run.ps1` for release asset and version regression checks. The build-zip and release workflows run these checks for every build.
+
+On first launch, a missing browser is downloaded even with `ChromiumAutoDownload=false` and `ChromiumCheckPeriod=0`. The default ungoogled-chromium source is the upstream Windows GitHub release, selecting a portable ZIP for the configured architecture. Explicit `ChromiumUpdateUrl` values still use the existing semicolon-separated metadata format. Update-check failures include the failing URL and error code in `launchbro_debug.log`.
