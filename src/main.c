@@ -214,6 +214,26 @@ VOID _app_thread_taskupdate_all (
 	_Inout_ PBROWSER_INFORMATION primary
 );
 
+static INT _app_get_language_menu_pos (
+	_In_opt_ HMENU hsettings
+)
+{
+	INT count;
+
+	if (!hsettings)
+		return LANG_MENU;
+
+	count = GetMenuItemCount (hsettings);
+
+	for (INT i = 0; i < count; i++)
+	{
+		if (GetSubMenu (hsettings, i))
+			return i;
+	}
+
+	return LANG_MENU;
+}
+
 // Create the desktop profile shortcut only when appropriate:
 //  - CreateShortcut (default on) is the master switch;
 //  - on a fresh install we always create it;
@@ -773,25 +793,29 @@ INT_PTR CALLBACK DlgProc (
 				hsubmenu = GetSubMenu (hmenu, 1);
 
 				if (hsubmenu)
-					_r_menu_setitemtextformat (hsubmenu, LANG_MENU, TRUE, L"%s (Language)", _r_locale_getstring (IDS_LANGUAGE));
+				{
+					INT lang_menu_pos = _app_get_language_menu_pos (hsubmenu);
 
-				_r_menu_setitemtextformat (hmenu, IDM_RUN, FALSE, L"%s...", _r_locale_getstring (IDS_RUN));
-				_r_menu_setitemtextformat (hmenu, IDM_OPEN, FALSE, L"%s...", _r_locale_getstring (IDS_OPEN));
-				_r_menu_setitemtext (hmenu, IDM_EXIT, FALSE, _r_locale_getstring (IDS_EXIT));
-				_r_menu_setitemtext (hmenu, IDM_RUNATEND_CHK, FALSE, _r_locale_getstring (IDS_RUNATEND_CHK));
-				_r_menu_setitemtext (hmenu, IDM_DARKMODE_CHK, FALSE, _r_locale_getstring (IDS_DARKMODE_CHK));
-				_r_menu_setitemtext (hmenu, IDM_TASKUPDATE_CHK, FALSE, _r_locale_getstring (IDS_TASKUPDATE_CHK));
-				_r_menu_setitemtext (hmenu, IDM_CREATESHORTCUTONUPDATE_CHK, FALSE, _r_locale_getstring (IDS_CREATESHORTCUTONUPDATE_CHK));
-				_r_menu_setitemtext (hmenu, IDM_AUTOCHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_AUTOCHECKUPDATES_CHK));
-				_r_menu_setitemtext (hmenu, IDM_CHECKFORUPDATES, FALSE, _r_locale_getstring (IDS_CHECKFORUPDATES));
-				_r_menu_setitemtext (hmenu, IDM_EXPORTPROFILE, FALSE, _r_locale_getstring (IDS_EXPORTPROFILE));
-				_r_menu_setitemtext (hmenu, IDM_IMPORTPROFILE, FALSE, _r_locale_getstring (IDS_IMPORTPROFILE));
-				_r_menu_setitemtext (hmenu, IDM_UNINSTALL, FALSE, _r_locale_getstring (IDS_UNINSTALL));
-				_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
-				_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
+					_r_menu_setitemtextformat (hsubmenu, lang_menu_pos, TRUE, L"%s (Language)", _r_locale_getstring (IDS_LANGUAGE));
 
-				// enum localizations
-				_r_locale_enum ((HWND)GetSubMenu (hmenu, 1), LANG_MENU, IDX_LANGUAGE);
+					_r_menu_setitemtextformat (hmenu, IDM_RUN, FALSE, L"%s...", _r_locale_getstring (IDS_RUN));
+					_r_menu_setitemtextformat (hmenu, IDM_OPEN, FALSE, L"%s...", _r_locale_getstring (IDS_OPEN));
+					_r_menu_setitemtext (hmenu, IDM_EXIT, FALSE, _r_locale_getstring (IDS_EXIT));
+					_r_menu_setitemtext (hmenu, IDM_RUNATEND_CHK, FALSE, _r_locale_getstring (IDS_RUNATEND_CHK));
+					_r_menu_setitemtext (hmenu, IDM_DARKMODE_CHK, FALSE, _r_locale_getstring (IDS_DARKMODE_CHK));
+					_r_menu_setitemtext (hmenu, IDM_TASKUPDATE_CHK, FALSE, _r_locale_getstring (IDS_TASKUPDATE_CHK));
+					_r_menu_setitemtext (hmenu, IDM_CREATESHORTCUTONUPDATE_CHK, FALSE, _r_locale_getstring (IDS_CREATESHORTCUTONUPDATE_CHK));
+					_r_menu_setitemtext (hmenu, IDM_AUTOCHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_AUTOCHECKUPDATES_CHK));
+					_r_menu_setitemtext (hmenu, IDM_CHECKFORUPDATES, FALSE, _r_locale_getstring (IDS_CHECKFORUPDATES));
+					_r_menu_setitemtext (hmenu, IDM_EXPORTPROFILE, FALSE, _r_locale_getstring (IDS_EXPORTPROFILE));
+					_r_menu_setitemtext (hmenu, IDM_IMPORTPROFILE, FALSE, _r_locale_getstring (IDS_IMPORTPROFILE));
+					_r_menu_setitemtext (hmenu, IDM_UNINSTALL, FALSE, _r_locale_getstring (IDS_UNINSTALL));
+					_r_menu_setitemtext (hmenu, IDM_WEBSITE, FALSE, _r_locale_getstring (IDS_WEBSITE));
+					_r_menu_setitemtextformat (hmenu, IDM_ABOUT, FALSE, L"%s\tF1", _r_locale_getstring (IDS_ABOUT));
+
+					// enum localizations
+					_r_locale_enum ((HWND)hsubmenu, lang_menu_pos, IDX_LANGUAGE);
+				}
 			}
 
 			_app_update_browser_info (hwnd, &browser_info);
@@ -1046,10 +1070,11 @@ INT_PTR CALLBACK DlgProc (
 			if (HIWORD (wparam) == 0 && LOWORD (wparam) >= IDX_LANGUAGE && LOWORD (wparam) <= IDX_LANGUAGE + _r_locale_getcount () + 1)
 			{
 				HMENU hmenu;
+				HMENU hsettings;
 
 				hmenu = GetMenu (hwnd);
-				hmenu = GetSubMenu (hmenu, 1);
-				hmenu = GetSubMenu (hmenu, LANG_MENU);
+				hsettings = GetSubMenu (hmenu, 1);
+				hmenu = GetSubMenu (hsettings, _app_get_language_menu_pos (hsettings));
 
 				_r_locale_apply (hmenu, LOWORD (wparam), IDX_LANGUAGE);
 
