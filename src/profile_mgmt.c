@@ -234,7 +234,7 @@ static BOOLEAN _app_copy_directory (
 // Does this folder look like an actual browser profile / user-data dir? Chromium user-data
 // dirs carry a "Local State" file and/or a "Default" subfolder; Firefox profiles carry
 // prefs.js / times.json. Used so import works no matter what the folder is named.
-static BOOLEAN _app_dir_is_profile (
+BOOLEAN _app_dir_is_profile (
 	_In_ LPCWSTR dir
 )
 {

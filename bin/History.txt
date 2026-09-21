@@ -1,3 +1,8 @@
+v2.9.12 (21 September 2026)
+- fixed the "Chromium needs to run once to register as a browser" dialog appearing when the browser profile already exists, the browser is running, or another browser is configured as default in Windows.
+- fixed scheduled auto-update checkbox in settings showing unticked when the scheduled task is already present in Windows Task Scheduler.
+- added a Settings toggle to configure whether desktop shortcuts of instances are created/refreshed after each update (CreateShortcutOnUpdate).
+
 v2.9.11 (6 September 2026)
 - fixed first-run ungoogled-chromium installation failing when the Woolyss metadata service blocks or redirects requests; default updates now use upstream GitHub Windows releases, preserving custom update URLs.
 - select only compatible portable browser archives and normalize Chromium package tags to the installed file version.

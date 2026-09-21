@@ -810,3 +810,53 @@ BOOLEAN _app_is_registry_patched (
 
 	return _app_is_protocol_registry_patched (L"https", pbi->profile_dir);
 }
+
+BOOLEAN _app_is_default_browser_other (
+	_In_ PBROWSER_INFORMATION pbi
+)
+{
+	static LPCWSTR protocols[] = {L"http", L"https"};
+	BOOLEAN is_other = FALSE;
+
+	if (!pbi || _r_obj_isstringempty (pbi->binary_path))
+		return FALSE;
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (protocols); i++)
+	{
+		PR_STRING assoc_subkey;
+		PR_STRING prog_id = NULL;
+		PR_STRING command = NULL;
+
+		assoc_subkey = _r_format_string (
+			L"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\%s\\UserChoice",
+			protocols[i]
+		);
+
+		if (!assoc_subkey)
+			continue;
+
+		if (_app_reg_read_string (HKEY_CURRENT_USER, assoc_subkey->buffer, L"ProgId", &prog_id) &&
+			_app_reg_read_open_command (prog_id, &command))
+		{
+			if (!_app_command_targets_selected_browser (pbi, command) &&
+				!_app_command_targets_stale_self (pbi, command))
+			{
+				is_other = TRUE;
+			}
+		}
+
+		if (command)
+			_r_obj_dereference (command);
+
+		if (prog_id)
+			_r_obj_dereference (prog_id);
+
+		_r_obj_dereference (assoc_subkey);
+
+		if (is_other)
+			break;
+	}
+
+	return is_other;
+}
+

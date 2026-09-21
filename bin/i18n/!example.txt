@@ -31,4 +31,6 @@ IDS_STATUS_ERROR=Error while checking update...
 IDS_STATUS_NOTFOUND=<not found>
 IDS_RUNATEND_CHK=Start browser at end
 IDS_DARKMODE_CHK=Use dark theme
+IDS_CREATESHORTCUTONUPDATE_CHK=Create shortcuts on desktop after update
+
 

@@ -87,7 +87,15 @@ BOOLEAN _app_patch_registry_profile (
 	_In_ PBROWSER_INFORMATION pbi
 );
 
+BOOLEAN _app_is_default_browser_other (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
 VOID _app_unpatch_registry_associations (VOID);
+
+BOOLEAN _app_dir_is_profile (
+	_In_ LPCWSTR dir
+);
 
 // task update
 BOOLEAN _app_taskupdate_istaskpresent ();

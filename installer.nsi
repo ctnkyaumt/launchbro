@@ -5,7 +5,7 @@
 !include "LogicLib.nsh"
 
 !define APP_NAME "launchbro"
-!define APP_VERSION "2.9.10"
+!define APP_VERSION "2.9.12"
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "launchbro-setup.exe"

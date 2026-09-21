@@ -540,6 +540,22 @@ BOOLEAN _app_ensure_registry_profile (
 		return FALSE;
 	}
 
+	// Do not prompt or launch-and-close if:
+	// 1. The browser profile already exists (it has already run before).
+	// 2. The browser is currently running.
+	// 3. The Windows default browser is set to another browser (running Chromium won't change that).
+	if (_app_dir_is_profile (pbi->profile_dir->buffer) ||
+		_r_fs_isfileused (&pbi->binary_path->sr) ||
+		_app_is_default_browser_other (pbi))
+	{
+		_r_config_setboolean (runonce_key ? runonce_key->buffer : L"RegistryProfileRunOnce", TRUE);
+
+		if (runonce_key)
+			_r_obj_dereference (runonce_key);
+
+		return FALSE;
+	}
+
 	// registry keys don't exist yet - browser needs to run once to register itself
 	// prompt user before doing this
 	is_declined = (_r_show_message (hwnd, MB_YESNO | MB_ICONQUESTION, NULL,
@@ -695,14 +711,10 @@ INT_PTR CALLBACK DlgProc (
 
 			if (hmenu)
 			{
-				is_taskenabled = _r_config_getboolean (L"TaskUpdateEnabled", FALSE);
+				is_taskenabled = _app_taskupdate_istaskpresent ();
+				_r_config_setboolean (L"TaskUpdateEnabled", is_taskenabled);
 
-				if (is_taskenabled && !_app_taskupdate_istaskpresent ())
-				{
-					is_taskenabled = FALSE;
-					_r_config_setboolean (L"TaskUpdateEnabled", FALSE);
-				}
-				else if (is_taskenabled)
+				if (is_taskenabled)
 				{
 					_app_taskupdate_setstartwhenavailable ();
 				}
@@ -710,6 +722,7 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_checkitem (hmenu, IDM_RUNATEND_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"ChromiumRunAtEnd", TRUE));
 				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
 				_r_menu_checkitem (hmenu, IDM_TASKUPDATE_CHK, 0, MF_BYCOMMAND, is_taskenabled);
+				_r_menu_checkitem (hmenu, IDM_CREATESHORTCUTONUPDATE_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"CreateShortcutOnUpdate", TRUE));
 				_r_menu_checkitem (hmenu, IDM_AUTOCHECKUPDATES_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"AutoCheckUpdates", TRUE));
 			}
 
@@ -768,6 +781,7 @@ INT_PTR CALLBACK DlgProc (
 				_r_menu_setitemtext (hmenu, IDM_RUNATEND_CHK, FALSE, _r_locale_getstring (IDS_RUNATEND_CHK));
 				_r_menu_setitemtext (hmenu, IDM_DARKMODE_CHK, FALSE, _r_locale_getstring (IDS_DARKMODE_CHK));
 				_r_menu_setitemtext (hmenu, IDM_TASKUPDATE_CHK, FALSE, _r_locale_getstring (IDS_TASKUPDATE_CHK));
+				_r_menu_setitemtext (hmenu, IDM_CREATESHORTCUTONUPDATE_CHK, FALSE, _r_locale_getstring (IDS_CREATESHORTCUTONUPDATE_CHK));
 				_r_menu_setitemtext (hmenu, IDM_AUTOCHECKUPDATES_CHK, FALSE, _r_locale_getstring (IDS_AUTOCHECKUPDATES_CHK));
 				_r_menu_setitemtext (hmenu, IDM_CHECKFORUPDATES, FALSE, _r_locale_getstring (IDS_CHECKFORUPDATES));
 				_r_menu_setitemtext (hmenu, IDM_EXPORTPROFILE, FALSE, _r_locale_getstring (IDS_EXPORTPROFILE));
@@ -1119,7 +1133,7 @@ INT_PTR CALLBACK DlgProc (
 				{
 					BOOLEAN new_val;
 
-					new_val = !_r_config_getboolean (L"TaskUpdateEnabled", FALSE);
+					new_val = !_app_taskupdate_istaskpresent ();
 
 					if (new_val)
 					{
@@ -1137,8 +1151,22 @@ INT_PTR CALLBACK DlgProc (
 						_app_taskupdate_deletetask ();
 					}
 
+					new_val = _app_taskupdate_istaskpresent ();
+
 					_r_menu_checkitem (GetMenu (hwnd), ctrl_id, 0, MF_BYCOMMAND, new_val);
 					_r_config_setboolean (L"TaskUpdateEnabled", new_val);
+
+					break;
+				}
+
+				case IDM_CREATESHORTCUTONUPDATE_CHK:
+				{
+					BOOLEAN new_val;
+
+					new_val = !_r_config_getboolean (L"CreateShortcutOnUpdate", TRUE);
+
+					_r_menu_checkitem (GetMenu (hwnd), ctrl_id, 0, MF_BYCOMMAND, new_val);
+					_r_config_setboolean (L"CreateShortcutOnUpdate", new_val);
 
 					break;
 				}
