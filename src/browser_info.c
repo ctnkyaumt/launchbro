@@ -806,13 +806,13 @@ APP_BROWSER_KIND _app_get_browser_kind (
 	_In_opt_ PR_STRING browser_type
 )
 {
-	static const R_STRINGREF ungoogled_sr = PR_STRINGREF_INIT (L"ungoogled-chromium");
-	static const R_STRINGREF cromite_sr = PR_STRINGREF_INIT (L"cromite");
-	static const R_STRINGREF stable_codecs_sr = PR_STRINGREF_INIT (L"stable-codecs-sync");
-	static const R_STRINGREF dev_nosync_sr = PR_STRINGREF_INIT (L"dev-nosync");
-	static const R_STRINGREF dev_official_sr = PR_STRINGREF_INIT (L"dev-official");
-	static const R_STRINGREF r3dfox_sr = PR_STRINGREF_INIT (L"r3dfox");
-	static const R_STRINGREF iceweasel_sr = PR_STRINGREF_INIT (L"iceweasel");
+	static R_STRINGREF ungoogled_sr = PR_STRINGREF_INIT (L"ungoogled-chromium");
+	static R_STRINGREF cromite_sr = PR_STRINGREF_INIT (L"cromite");
+	static R_STRINGREF stable_codecs_sr = PR_STRINGREF_INIT (L"stable-codecs-sync");
+	static R_STRINGREF dev_nosync_sr = PR_STRINGREF_INIT (L"dev-nosync");
+	static R_STRINGREF dev_official_sr = PR_STRINGREF_INIT (L"dev-official");
+	static R_STRINGREF r3dfox_sr = PR_STRINGREF_INIT (L"r3dfox");
+	static R_STRINGREF iceweasel_sr = PR_STRINGREF_INIT (L"iceweasel");
 
 	if (!browser_type || _r_obj_isstringempty (browser_type))
 		return BROWSER_KIND_UNKNOWN;

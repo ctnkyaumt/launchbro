@@ -40,7 +40,7 @@ static BOOLEAN _app_is_exact_key (
 	_In_ SIZE_T key_length
 )
 {
-	return (_r_str_compare (arg, key, key_length) == 0 &&
+	return (_wcsnicmp (arg, key, key_length) == 0 &&
 		(arg[key_length] == L'\0' || arg[key_length] == L'=' || arg[key_length] == L':'));
 }
 
