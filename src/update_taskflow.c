@@ -213,9 +213,10 @@ VOID _app_thread_taskupdate_all (
 
 		_app_update_browser_info (hwnd, pbi);
 
-		_app_taskupdate_closebrowser (pbi, &was_running[instance_id - 1]);
+		if (_r_obj_isstringempty (pbi->binary_path))
+			continue;
 
-		BOOLEAN was_installed = pbi->binary_path ? _r_fs_exists (&pbi->binary_path->sr) : FALSE;
+		BOOLEAN was_installed = _r_fs_exists (&pbi->binary_path->sr);
 
 		if (!_app_isupdatedownloaded (pbi))
 		{
@@ -229,7 +230,9 @@ VOID _app_thread_taskupdate_all (
 				continue;
 		}
 
-		for (INT i = 0; i < 14; i++)
+		_app_taskupdate_closebrowser (pbi, &was_running[instance_id - 1]);
+
+		for (INT i = 0; i < 210; i++)
 		{
 			if (!_r_fs_isfileused (&pbi->binary_path->sr))
 			{
@@ -242,7 +245,7 @@ VOID _app_thread_taskupdate_all (
 				break;
 			}
 
-			Sleep (30000);
+			Sleep (2000);
 		}
 	}
 

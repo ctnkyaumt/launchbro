@@ -226,15 +226,7 @@ static BOOLEAN _app_is_firefox_profile_target (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {
-	R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-	R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-
-	if (!pbi || _r_obj_isstringempty (pbi->browser_type))
-		return FALSE;
-
-	return
-		_r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) ||
-		_r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE);
+	return _app_is_firefox_fork (pbi);
 }
 
 static BOOLEAN _app_command_targets_launchbro (

@@ -34,6 +34,16 @@ static BOOLEAN _app_path_is_url (
 	return FALSE;
 }
 
+static BOOLEAN _app_is_exact_key (
+	_In_ LPCWSTR arg,
+	_In_ LPCWSTR key,
+	_In_ SIZE_T key_length
+)
+{
+	return (_r_str_compare (arg, key, key_length) == 0 &&
+		(arg[key_length] == L'\0' || arg[key_length] == L'=' || arg[key_length] == L':'));
+}
+
 VOID _app_parse_args (
 	_Inout_ PBROWSER_INFORMATION pbi
 )
@@ -42,15 +52,12 @@ VOID _app_parse_args (
 	LPWSTR key;
 	LPWSTR key2;
 	LPWSTR value_ptr;
-	ULONG_PTR first_arg_length = 0;
 	INT numargs;
 
 	arga = CommandLineToArgvW (_r_sys_getcommandline (), &numargs);
 
 	if (!arga)
 		return;
-
-	first_arg_length = _r_str_getlength (arga[0]);
 
 	pbi->is_hasargs = (numargs > 1);
 
@@ -64,19 +71,21 @@ VOID _app_parse_args (
 			{
 				key2 = PTR_ADD_OFFSET (key, sizeof (WCHAR));
 
-				if (_r_str_compare (key2, L"autodownload", 12) == 0)
+				if (_app_is_exact_key (key2, L"autodownload", 12))
 				{
 					pbi->is_autodownload = TRUE;
 				}
-				else if (_r_str_compare (key2, L"arch", 4) == 0 || _r_str_compare (key2, L"architecture", 12) == 0)
+				else if (_app_is_exact_key (key2, L"arch", 4) || _app_is_exact_key (key2, L"architecture", 12))
 				{
+					SIZE_T key_len = _app_is_exact_key (key2, L"arch", 4) ? 4 : 12;
+
 					value_ptr = NULL;
 
-					if (key2[4] == L'=' || key2[4] == L':')
+					if (key2[key_len] == L'=' || key2[key_len] == L':')
 					{
-						value_ptr = PTR_ADD_OFFSET (key2, (4 + 1) * sizeof (WCHAR));
+						value_ptr = PTR_ADD_OFFSET (key2, (key_len + 1) * sizeof (WCHAR));
 					}
-					else if (key2[4] == 0 && i + 1 < numargs)
+					else if (key2[key_len] == 0 && i + 1 < numargs)
 					{
 						value_ptr = arga[++i];
 					}
@@ -89,15 +98,15 @@ VOID _app_parse_args (
 							pbi->architecture = arch;
 					}
 				}
-				else if (_r_str_compare (key2, L"bringtofront", 12) == 0)
+				else if (_app_is_exact_key (key2, L"bringtofront", 12))
 				{
 					pbi->is_bringtofront = TRUE;
 				}
-				else if (_r_str_compare (key2, L"forcecheck", 10) == 0)
+				else if (_app_is_exact_key (key2, L"forcecheck", 10))
 				{
 					pbi->is_forcecheck = TRUE;
 				}
-				else if (_r_str_compare (key2, L"instance", 8) == 0)
+				else if (_app_is_exact_key (key2, L"instance", 8))
 				{
 					value_ptr = NULL;
 
@@ -118,20 +127,20 @@ VOID _app_parse_args (
 							pbi->instance_id = instance_id;
 					}
 				}
-				else if (_r_str_compare (key2, L"newinstance", 11) == 0)
+				else if (_app_is_exact_key (key2, L"newinstance", 11))
 				{
 					if (pbi->instance_id < 1)
 						pbi->is_newinstance = TRUE;
 				}
-				else if (_r_str_compare (key2, L"wait", 4) == 0)
+				else if (_app_is_exact_key (key2, L"wait", 4))
 				{
 					pbi->is_waitdownloadend = TRUE;
 				}
-				else if (_r_str_compare (key2, L"update", 6) == 0)
+				else if (_app_is_exact_key (key2, L"update", 6))
 				{
 					pbi->is_onlyupdate = TRUE;
 				}
-				else if (_r_str_compare (key2, L"taskupdate", 10) == 0)
+				else if (_app_is_exact_key (key2, L"taskupdate", 10))
 				{
 					pbi->is_taskupdate = TRUE;
 				}
@@ -162,7 +171,7 @@ VOID _app_parse_args (
 
 	if (pbi->is_hasurls)
 	{
-		pbi->urls_str = _r_obj_createstring (_r_sys_getcommandline () + first_arg_length + 2);
+		pbi->urls_str = _r_obj_createstring (PathGetArgsW (_r_sys_getcommandline ()));
 
 		_r_str_trimstring2 (&pbi->urls_str->sr, L" ", 0);
 	}

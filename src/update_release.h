@@ -4,6 +4,14 @@
 #include <wchar.h>
 #include <wctype.h>
 
+enum
+{
+	RELEASE_POLICY_GENERIC = 0,
+	RELEASE_POLICY_UNGOOGLED,
+	RELEASE_POLICY_HIBBIKI,
+	RELEASE_POLICY_ROBRICH,
+};
+
 static int _app_release_contains (const wchar_t* text, const wchar_t* needle)
 {
 	size_t length = wcslen (needle);
@@ -20,6 +28,22 @@ static int _app_release_contains (const wchar_t* text, const wchar_t* needle)
 	return 0;
 }
 
+static int _app_release_equal_nocase (const wchar_t* a, const wchar_t* b)
+{
+	if (!a || !b)
+		return 0;
+
+	while (*a && *b)
+	{
+		if (towlower (*a) != towlower (*b))
+			return 0;
+		a++;
+		b++;
+	}
+
+	return *a == *b;
+}
+
 static int _app_release_endswith (const wchar_t* text, const wchar_t* suffix)
 {
 	size_t length = wcslen (text);
@@ -28,7 +52,51 @@ static int _app_release_endswith (const wchar_t* text, const wchar_t* suffix)
 	return length >= suffix_length && _app_release_contains (text + length - suffix_length, suffix);
 }
 
-static int _app_release_asset_score (const wchar_t* name, int architecture, int is_ungoogled)
+static int _app_release_tag_endswith (const wchar_t* tag, const wchar_t* suffix)
+{
+	size_t tag_length;
+	size_t suffix_length;
+
+	if (!tag || !suffix)
+		return 0;
+
+	tag_length = wcslen (tag);
+	suffix_length = wcslen (suffix);
+
+	if (tag_length < suffix_length)
+		return 0;
+
+	return _app_release_equal_nocase (tag + tag_length - suffix_length, suffix);
+}
+
+static size_t _app_release_revision_length (const wchar_t* text)
+{
+	size_t digits = 0;
+	size_t i = 0;
+
+	if (!text)
+		return 0;
+
+	while (text[i] >= L'0' && text[i] <= L'9')
+	{
+		digits++;
+		i++;
+	}
+
+	if (digits == 0)
+		return 0;
+
+	while (text[i])
+	{
+		if (text[i] != L' ' && text[i] != L'\t' && text[i] != L'\r' && text[i] != L'\n')
+			return 0;
+		i++;
+	}
+
+	return digits;
+}
+
+static int _app_release_asset_score (const wchar_t* name, int architecture, int policy)
 {
 	int score;
 	int is_x64;
@@ -37,9 +105,25 @@ static int _app_release_asset_score (const wchar_t* name, int architecture, int 
 	if (!name || (architecture != 32 && architecture != 64))
 		return -1;
 
+	if (policy == RELEASE_POLICY_HIBBIKI)
+	{
+		if (architecture != 64)
+			return -1;
+
+		return _app_release_equal_nocase (name, L"chrome.7z") ? 10 : -1;
+	}
+
+	if (policy == RELEASE_POLICY_ROBRICH)
+	{
+		if (architecture != 64)
+			return -1;
+
+		return _app_release_equal_nocase (name, L"chrome.zip") ? 10 : -1;
+	}
+
 	// Only the upstream portable Windows archive is usable by our extractor.
 	// In particular, ARM64 and installer assets must never win by a "64" match.
-	if (is_ungoogled)
+	if (policy == RELEASE_POLICY_UNGOOGLED)
 	{
 		if (wcsncmp (name, L"ungoogled-chromium_", 19) != 0)
 			return -1;

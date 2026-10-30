@@ -1,3 +1,12 @@
+v2.9.13 (30 October 2026)
+- replaced the shut-down Woolyss update service: stable-codecs-sync now updates from Hibbiki/chromium-win64, dev-nosync from RobRich999/Chromium_Clang (win64 AVX2) and dev-official from Google's Chromium snapshots (revision-tracked); the footer link now points to ungoogled-chromium releases.
+- removed the dev-codecs-sync and dev-codecs-nosync build types (no longer published upstream) and the ignored ChromiumDirectory setting from the docs.
+- fixed scheduled auto-update closing running browsers even when no update was available; browsers are now closed only once an update has been downloaded.
+- fixed the one-time browser registration step possibly terminating an unrelated chrome.exe (e.g. Google Chrome); only processes of the managed browser binary are closed.
+- browser updates are now extracted next to the installed copy and swapped in at the end, so an interrupted update no longer loses the installed browser; any extraction error now fails the update instead of installing a partial browser, and unsafe archive paths are rejected.
+- fixed /architecture=64 being ignored, URLs passed to an unquoted launchbro.exe losing their first character, and a dangling tooltip text buffer.
+- launchbro's own update check and the scheduled-task sync no longer block the window at startup; download and install progress updates are throttled.
+
 v2.9.12 (21 September 2026)
 - fixed the "Chromium needs to run once to register as a browser" dialog appearing when the browser profile already exists, the browser is running, or another browser is configured as default in Windows.
 - fixed scheduled auto-update checkbox in settings showing unticked when the scheduled task is already present in Windows Task Scheduler.

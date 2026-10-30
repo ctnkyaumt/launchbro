@@ -8,7 +8,7 @@
 
 #include "resource.h"
 #include <shellapi.h>
-#include <tlhelp32.h>
+#include <objbase.h>
 
 BROWSER_INFORMATION browser_info = {0};
 
@@ -27,8 +27,6 @@ typedef enum _APP_ICON_STATE
 HICON hicon_app_small = NULL;
 HICON hicon_app_large = NULL;
 APP_ICON_STATE current_icon_state = APP_ICON_STATE_IDLE;
-
-extern BOOLEAN _app_is_firefox_fork (PBROWSER_INFORMATION pbi);
 
 static INT _app_geticonresourceid (
 	_In_ APP_ICON_STATE icon_state
@@ -622,52 +620,15 @@ BOOLEAN _app_ensure_registry_profile (
 	// wait a few seconds for the browser to register itself and create profile files
 	Sleep (5000);
 
-	// try to find and close the browser process
+	_app_taskupdate_terminateprocesses (pbi);
+
+	for (INT i = 0; i < 20; i++)
 	{
-		HANDLE snapshot = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+		if (!_r_fs_isfileused (&pbi->binary_path->sr))
+			break;
 
-		if (snapshot != INVALID_HANDLE_VALUE)
-		{
-			PROCESSENTRY32W pe = {0};
-			pe.dwSize = sizeof (pe);
-
-			if (Process32FirstW (snapshot, &pe))
-			{
-				R_STRINGREF binary_name_sr;
-				R_STRINGREF exe_name_sr;
-
-				_r_path_getpathinfo (&pbi->binary_path->sr, NULL, &binary_name_sr);
-
-				do
-				{
-					_r_obj_initializestringref (&exe_name_sr, pe.szExeFile);
-
-					if (_r_str_isequal (&binary_name_sr, &exe_name_sr, TRUE))
-					{
-					HANDLE hproc = OpenProcess (PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pe.th32ProcessID);
-
-						if (hproc)
-						{
-							TerminateProcess (hproc, 0);
-
-							// wait for process to exit
-							WaitForSingleObject (hproc, 10000);
-
-							NtClose (hproc);
-						}
-
-						break;
-					}
-				}
-				while (Process32NextW (snapshot, &pe));
-			}
-
-			NtClose (snapshot);
-		}
+		Sleep (500);
 	}
-
-	// give it a moment after closing
-	Sleep (2000);
 
 	if (runonce_key)
 		_r_obj_dereference (runonce_key);
@@ -731,13 +692,7 @@ INT_PTR CALLBACK DlgProc (
 
 			if (hmenu)
 			{
-				is_taskenabled = _app_taskupdate_istaskpresent ();
-				_r_config_setboolean (L"TaskUpdateEnabled", is_taskenabled);
-
-				if (is_taskenabled)
-				{
-					_app_taskupdate_setstartwhenavailable ();
-				}
+				is_taskenabled = _r_config_getboolean (L"TaskUpdateEnabled", FALSE);
 
 				_r_menu_checkitem (hmenu, IDM_RUNATEND_CHK, 0, MF_BYCOMMAND, _r_config_getboolean (L"ChromiumRunAtEnd", TRUE));
 				_r_menu_checkitem (hmenu, IDM_DARKMODE_CHK, 0, MF_BYCOMMAND, _r_theme_isenabled ());
@@ -951,7 +906,7 @@ INT_PTR CALLBACK DlgProc (
 				case TTN_GETDISPINFO:
 				{
 					LPNMTTDISPINFOW lpnmdi;
-					WCHAR buffer[1024];
+					static WCHAR buffer[1024];
 					PR_STRING string;
 					INT ctrl_id;
 
@@ -1336,6 +1291,39 @@ static VOID _app_auto_check_updates (
 		_r_obj_dereference (download_url);
 }
 
+static DWORD WINAPI _app_background_init_thread (
+	_In_ LPVOID param
+)
+{
+	HWND hwnd = (HWND)param;
+	HRESULT hr;
+	BOOLEAN is_taskenabled;
+	HMENU hmenu;
+
+	hr = CoInitializeEx (NULL, COINIT_APARTMENTTHREADED);
+
+	is_taskenabled = _app_taskupdate_istaskpresent ();
+	_r_config_setboolean (L"TaskUpdateEnabled", is_taskenabled);
+
+	if (is_taskenabled)
+	{
+		_app_taskupdate_setstartwhenavailable ();
+	}
+
+	hmenu = GetMenu (hwnd);
+
+	if (hmenu)
+		_r_menu_checkitem (hmenu, IDM_TASKUPDATE_CHK, 0, MF_BYCOMMAND, is_taskenabled);
+
+	if (SUCCEEDED (hr))
+		CoUninitialize ();
+
+	if (!browser_info.is_taskupdate)
+		_app_auto_check_updates (hwnd);
+
+	return 0;
+}
+
 INT APIENTRY wWinMain (
 	_In_ HINSTANCE hinst,
 	_In_opt_ HINSTANCE prev_hinst,
@@ -1382,8 +1370,14 @@ INT APIENTRY wWinMain (
 		}
 	}
 
-	// Auto-check for app updates
-	_app_auto_check_updates (hwnd);
+	// Scheduled task sync and app update check run off the UI thread
+	// (the app update check is skipped for unattended /taskupdate runs)
+	{
+		HANDLE hthread = CreateThread (NULL, 0, &_app_background_init_thread, (LPVOID)hwnd, 0, NULL);
+
+		if (hthread)
+			CloseHandle (hthread);
+	}
 
 	return _r_wnd_message_callback (hwnd, MAKEINTRESOURCE (IDA_MAIN));
 }

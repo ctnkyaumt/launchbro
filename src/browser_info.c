@@ -504,19 +504,7 @@ VOID _app_init_browser_info (
 	if (pbi->instance_id < 1)
 		pbi->instance_id = 1;
 
-	if (pbi->instance_id >= 2 && pbi->instance_id <= 4)
-	{
-		PR_STRING type_key = _r_format_string (L"ChromiumType%" TEXT (PR_LONG), pbi->instance_id);
-
-		if (type_key)
-		{
-			type_for_binary = _r_config_getstring (type_key->buffer, NULL);
-			_r_obj_dereference (type_key);
-		}
-	}
-
-	if (!type_for_binary)
-		type_for_binary = _r_config_getstring (L"ChromiumType", CHROMIUM_TYPE);
+	type_for_binary = _app_get_instance_type (pbi->instance_id, CHROMIUM_TYPE);
 
 	binary_name_cfg = _r_config_getstring (L"ChromiumBinary", NULL);
 
@@ -527,12 +515,11 @@ VOID _app_init_browser_info (
 	}
 	else if (type_for_binary && !_r_obj_isstringempty (type_for_binary))
 	{
-		R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-		R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
+		APP_BROWSER_KIND kind = _app_get_browser_kind (type_for_binary);
 
-		if (_r_str_isequal (&type_for_binary->sr, &r3dfox_type, TRUE))
+		if (kind == BROWSER_KIND_R3DFOX)
 			binary_name = _r_obj_createstring (L"r3dfox.exe");
-		else if (_r_str_isequal (&type_for_binary->sr, &iceweasel_type, TRUE))
+		else if (kind == BROWSER_KIND_ICEWEASEL)
 			binary_name = _r_obj_createstring (L"Iceweasel.exe");
 		else
 			binary_name = _r_obj_createstring (L"chrome.exe");
@@ -727,29 +714,11 @@ VOID _app_init_browser_info (
 
 	_r_obj_dereference (binary_dir);
 
-	if (pbi->instance_id >= 2 && pbi->instance_id <= 4)
-	{
-		PR_STRING type_key;
-
-		type_key = _r_format_string (L"ChromiumType%" TEXT (PR_LONG), pbi->instance_id);
-
-		if (type_key)
-		{
-			browser_type = _r_config_getstring (type_key->buffer, NULL);
-			_r_obj_dereference (type_key);
-		}
-	}
-
-	if (!browser_type)
-		browser_type = _r_config_getstring (L"ChromiumType", CHROMIUM_TYPE);
-
+	browser_type = _app_get_instance_type (pbi->instance_id, CHROMIUM_TYPE);
 
 	if (browser_type)
 	{
-		R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-		R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-
-		if (_r_str_isequal (&browser_type->sr, &r3dfox_type, TRUE) || _r_str_isequal (&browser_type->sr, &iceweasel_type, TRUE))
+		if (_app_is_firefox_kind (_app_get_browser_kind (browser_type)))
 		{
 			PR_STRING cmd_key = NULL;
 
@@ -783,15 +752,10 @@ VOID _app_init_browser_info (
 	{
 		PR_STRING updated_args;
 
-		{
-			R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-			R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-
-			if (pbi->browser_type && (_r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) || _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE)))
-				updated_args = _app_apply_profile_dir_firefox (pbi->args_str, pbi->profile_dir);
-			else
-				updated_args = _app_apply_profile_dir (pbi->args_str, pbi->profile_dir);
-		}
+		if (_app_is_firefox_fork (pbi))
+			updated_args = _app_apply_profile_dir_firefox (pbi->args_str, pbi->profile_dir);
+		else
+			updated_args = _app_apply_profile_dir (pbi->args_str, pbi->profile_dir);
 
 		if (updated_args)
 			_r_obj_movereference ((PVOID_PTR)&pbi->args_str, updated_args);
@@ -838,16 +802,89 @@ VOID _app_init_browser_info (
 
 }
 
+APP_BROWSER_KIND _app_get_browser_kind (
+	_In_opt_ PR_STRING browser_type
+)
+{
+	static const R_STRINGREF ungoogled_sr = PR_STRINGREF_INIT (L"ungoogled-chromium");
+	static const R_STRINGREF cromite_sr = PR_STRINGREF_INIT (L"cromite");
+	static const R_STRINGREF stable_codecs_sr = PR_STRINGREF_INIT (L"stable-codecs-sync");
+	static const R_STRINGREF dev_nosync_sr = PR_STRINGREF_INIT (L"dev-nosync");
+	static const R_STRINGREF dev_official_sr = PR_STRINGREF_INIT (L"dev-official");
+	static const R_STRINGREF r3dfox_sr = PR_STRINGREF_INIT (L"r3dfox");
+	static const R_STRINGREF iceweasel_sr = PR_STRINGREF_INIT (L"iceweasel");
+
+	if (!browser_type || _r_obj_isstringempty (browser_type))
+		return BROWSER_KIND_UNKNOWN;
+
+	if (_r_str_isequal (&browser_type->sr, &ungoogled_sr, TRUE))
+		return BROWSER_KIND_UNGOOGLED;
+
+	if (_r_str_isequal (&browser_type->sr, &cromite_sr, TRUE))
+		return BROWSER_KIND_CROMITE;
+
+	if (_r_str_isequal (&browser_type->sr, &stable_codecs_sr, TRUE))
+		return BROWSER_KIND_STABLE_CODECS_SYNC;
+
+	if (_r_str_isequal (&browser_type->sr, &dev_nosync_sr, TRUE))
+		return BROWSER_KIND_DEV_NOSYNC;
+
+	if (_r_str_isequal (&browser_type->sr, &dev_official_sr, TRUE))
+		return BROWSER_KIND_DEV_OFFICIAL;
+
+	if (_r_str_isequal (&browser_type->sr, &r3dfox_sr, TRUE))
+		return BROWSER_KIND_R3DFOX;
+
+	if (_r_str_isequal (&browser_type->sr, &iceweasel_sr, TRUE))
+		return BROWSER_KIND_ICEWEASEL;
+
+	return BROWSER_KIND_UNKNOWN;
+}
+
+BOOLEAN _app_is_firefox_kind (
+	_In_ APP_BROWSER_KIND kind
+)
+{
+	return (kind == BROWSER_KIND_R3DFOX || kind == BROWSER_KIND_ICEWEASEL);
+}
+
+PR_STRING _app_get_instance_type (
+	_In_ LONG instance_id,
+	_In_opt_ LPCWSTR default_type
+)
+{
+	PR_STRING type = NULL;
+
+	if (instance_id >= 2 && instance_id <= 4)
+	{
+		PR_STRING type_key = _r_format_string (L"ChromiumType%" TEXT (PR_LONG), instance_id);
+
+		if (type_key)
+		{
+			type = _r_config_getstring (type_key->buffer, NULL);
+			_r_obj_dereference (type_key);
+		}
+
+		if (type && _r_obj_isstringempty (type))
+		{
+			_r_obj_dereference (type);
+			type = NULL;
+		}
+	}
+
+	if (!type)
+		type = _r_config_getstring (L"ChromiumType", default_type);
+
+	return type;
+}
+
 BOOLEAN _app_is_firefox_fork (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {
-	R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-	R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-
 	if (!pbi || !pbi->browser_type)
 		return FALSE;
 
-	return _r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE) || _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE);
+	return _app_is_firefox_kind (_app_get_browser_kind (pbi->browser_type));
 }
 

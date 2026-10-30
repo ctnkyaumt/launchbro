@@ -59,7 +59,7 @@ BOOL CALLBACK close_browser_window_callback (
 	return TRUE;
 }
 
-static BOOLEAN _app_taskupdate_terminateprocesses (
+BOOLEAN _app_taskupdate_terminateprocesses (
 	_In_ PBROWSER_INFORMATION pbi
 )
 {

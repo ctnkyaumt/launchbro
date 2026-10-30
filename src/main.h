@@ -14,16 +14,32 @@ DEFINE_GUID (GUID_TrayIcon, 0xEAD41630, 0x90BB, 0x4836, 0x82, 0x41, 0xAE, 0xAE, 
 #define LANG_MENU 6
 
 #define FOOTER_STRING L"<a href=\"https://github.com/ctnkyaumt\">github.com/ctnkyaumt</a>\r\n" \
-	L"<a href=\"https://chromium.woolyss.com\">chromium.woolyss.com</a>"
+	L"<a href=\"https://github.com/ungoogled-software/ungoogled-chromium-windows/releases\">ungoogled-chromium</a>"
 
-#define CHROMIUM_UPDATE_URL L"https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string"
 #define CHROMIUM_UPDATE_URL_CROMITE L"https://github.com/uazo/cromite/releases/latest/download/updateurl.txt"
 #define CHROMIUM_UPDATE_URL_UNGOOGLED L"https://api.github.com/repos/ungoogled-software/ungoogled-chromium-windows/releases/latest"
+#define CHROMIUM_UPDATE_URL_HIBBIKI L"https://api.github.com/repos/Hibbiki/chromium-win64/releases/latest"
+#define CHROMIUM_UPDATE_URL_ROBRICH L"https://api.github.com/repos/RobRich999/Chromium_Clang/releases?per_page=50"
+#define CHROMIUM_SNAPSHOT_URL L"https://storage.googleapis.com/chromium-browser-snapshots/%s/"
+#define UPDATE_URL_R3DFOX L"https://api.github.com/repos/Eclipse-Community/r3dfox/releases/latest"
+#define UPDATE_URL_ICEWEASEL L"https://api.github.com/repos/adonais/iceweasel/releases/latest"
 
 #define CHROMIUM_TYPE L"ungoogled-chromium"
 #define CHROMIUM_COMMAND_LINE L"--flag-switches-begin --user-data-dir=..\\profile --no-default-browser-check --disable-logging --no-report-upload --flag-switches-end"
 
 #define LAUNCHBRO_UPDATE_URL L"https://api.github.com/repos/ctnkyaumt/launchbro/releases/latest"
+
+typedef enum _APP_BROWSER_KIND
+{
+	BROWSER_KIND_UNKNOWN = 0,
+	BROWSER_KIND_UNGOOGLED,
+	BROWSER_KIND_CROMITE,
+	BROWSER_KIND_STABLE_CODECS_SYNC,
+	BROWSER_KIND_DEV_NOSYNC,
+	BROWSER_KIND_DEV_OFFICIAL,
+	BROWSER_KIND_R3DFOX,
+	BROWSER_KIND_ICEWEASEL,
+} APP_BROWSER_KIND;
 
 typedef struct _BROWSER_INFORMATION
 {
@@ -50,6 +66,7 @@ typedef struct _BROWSER_INFORMATION
 	LONG check_period;
 	LONG architecture;
 	LONG instance_id;
+	LONG progress_percent;
 
 	BOOLEAN is_autodownload;
 	BOOLEAN is_bringtofront;
@@ -64,6 +81,28 @@ typedef struct _BROWSER_INFORMATION
 	BOOLEAN is_taskupdate;
 	BOOLEAN is_waitdownloadend;
 } BROWSER_INFORMATION, *PBROWSER_INFORMATION;
+
+APP_BROWSER_KIND _app_get_browser_kind (
+	_In_opt_ PR_STRING browser_type
+);
+
+BOOLEAN _app_is_firefox_kind (
+	_In_ APP_BROWSER_KIND kind
+);
+
+PR_STRING _app_get_instance_type (
+	_In_ LONG instance_id,
+	_In_opt_ LPCWSTR default_type
+);
+
+BOOLEAN _app_is_firefox_fork (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
+PR_STRING _app_json_find_string_value (
+	_In_ LPCWSTR json,
+	_In_ LPCWSTR key
+);
 
 BOOLEAN _app_ensure_registry_profile (
 	_In_ HWND hwnd,
@@ -102,6 +141,9 @@ BOOLEAN _app_taskupdate_istaskpresent ();
 BOOLEAN _app_taskupdate_setstartwhenavailable ();
 BOOLEAN _app_taskupdate_createtask ();
 BOOLEAN _app_taskupdate_deletetask ();
+BOOLEAN _app_taskupdate_terminateprocesses (
+	_In_ PBROWSER_INFORMATION pbi
+);
 
 // self-update
 BOOLEAN _app_check_self_update (

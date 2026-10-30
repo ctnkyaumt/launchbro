@@ -96,7 +96,7 @@ static LPCWSTR _app_json_skip_whitespace (
 	return ptr;
 }
 
-static PR_STRING _app_json_find_string_value (
+PR_STRING _app_json_find_string_value (
 	_In_ LPCWSTR json,
 	_In_ LPCWSTR key
 )
@@ -134,7 +134,8 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	_In_ PBROWSER_INFORMATION pbi,
 	_In_ LPCWSTR release_api_url,
 	_In_ BOOLEAN is_exists,
-	_In_ BOOLEAN is_ungoogled,
+	_In_ int policy,
+	_In_opt_ LPCWSTR tag_suffix,
 	_Out_ PBOOLEAN is_error_ptr
 )
 {
@@ -144,7 +145,8 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	PR_STRING json = NULL;
 	PR_STRING tag_name = NULL;
 	PR_STRING selected_url = NULL;
-	LPCWSTR assets_ptr;
+	LPCWSTR assets_ptr = NULL;
+	LPCWSTR assets_limit = NULL;
 	LPCWSTR scan_ptr;
 	BOOLEAN is_success = FALSE;
 	NTSTATUS status;
@@ -189,9 +191,57 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	download_info.string = NULL;
 	_r_inet_destroydownload (&download_info);
 
-	tag_name = _app_json_find_string_value (json->buffer, L"tag_name");
+	if (tag_suffix)
+	{
+		LPCWSTR search = json->buffer;
 
-	if (!tag_name)
+		while ((search = wcsstr (search, L"\"tag_name\"")) != NULL)
+		{
+			PR_STRING candidate_tag = _app_json_find_string_value (search, L"tag_name");
+
+			if (candidate_tag)
+			{
+				if (_app_release_tag_endswith (candidate_tag->buffer, tag_suffix))
+				{
+					tag_name = candidate_tag;
+					break;
+				}
+
+				_r_obj_dereference (candidate_tag);
+			}
+
+			search += 10;
+		}
+
+		if (!tag_name || !search)
+		{
+			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+			*is_error_ptr = TRUE;
+			goto CleanupExit;
+		}
+
+		assets_ptr = wcsstr (search, L"\"assets\"");
+		assets_limit = wcsstr (search + 10, L"\"tag_name\"");
+
+		if (!assets_limit)
+			assets_limit = json->buffer + (json->length / sizeof (WCHAR));
+	}
+	else
+	{
+		tag_name = _app_json_find_string_value (json->buffer, L"tag_name");
+
+		if (!tag_name)
+		{
+			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+			*is_error_ptr = TRUE;
+			goto CleanupExit;
+		}
+
+		assets_ptr = wcsstr (json->buffer, L"\"assets\"");
+		assets_limit = json->buffer + (json->length / sizeof (WCHAR));
+	}
+
+	if (!assets_ptr || assets_ptr >= assets_limit)
 	{
 		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
 		*is_error_ptr = TRUE;
@@ -209,9 +259,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 		}
 	}
 
-	assets_ptr = wcsstr (json->buffer, L"\"assets\"");
-
-	if (is_ungoogled)
+	if (policy == RELEASE_POLICY_UNGOOGLED || policy == RELEASE_POLICY_HIBBIKI || policy == RELEASE_POLICY_ROBRICH)
 	{
 		SIZE_T version_length = _app_release_chromium_version_length (tag_name->buffer);
 
@@ -226,20 +274,13 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 		tag_name->buffer[version_length] = UNICODE_NULL;
 	}
 
-	if (!assets_ptr)
-	{
-		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
-		*is_error_ptr = TRUE;
-		goto CleanupExit;
-	}
-
 	scan_ptr = assets_ptr;
 
 	{
 		LONG best_score = -1;
 		LPCWSTR p = scan_ptr;
 
-		while ((p = wcsstr (p, L"\"name\"")) != NULL)
+		while ((p = wcsstr (p, L"\"name\"")) != NULL && p < assets_limit)
 		{
 			PR_STRING asset_name = NULL;
 			PR_STRING asset_url = NULL;
@@ -257,7 +298,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 			}
 
 			next_name = wcsstr (p + 6, L"\"name\"");
-			url_search_end = next_name ? next_name : (json->buffer + (json->length / sizeof (WCHAR)));
+			url_search_end = (next_name && next_name < assets_limit) ? next_name : assets_limit;
 
 			url_key = wcsstr (p, L"\"browser_download_url\"");
 
@@ -277,7 +318,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 				continue;
 			}
 
-			score = _app_release_asset_score (asset_name->buffer, pbi->architecture, is_ungoogled);
+			score = _app_release_asset_score (asset_name->buffer, pbi->architecture, policy);
 
 			if (wcsncmp (asset_url->buffer, L"https://github.com/", 19) != 0)
 				score = -1;
@@ -349,6 +390,187 @@ CleanupExit:
 	return is_success;
 }
 
+static BOOLEAN _app_checkupdate_snapshot (
+	_In_ HWND hwnd,
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ BOOLEAN is_exists,
+	_Out_ PBOOLEAN is_error_ptr
+)
+{
+	R_DOWNLOAD_INFO download_info;
+	PR_STRING proxy_string = NULL;
+	HINTERNET hsession = NULL;
+	PR_STRING content = NULL;
+	PR_STRING base_url = NULL;
+	PR_STRING last_change_url = NULL;
+	PR_STRING archive_url = NULL;
+	PR_STRING new_rev_str = NULL;
+	PR_STRING stored_rev_str = NULL;
+	PR_STRING rev_key = NULL;
+	LPCWSTR folder;
+	SIZE_T rev_len;
+	LONG64 current_rev;
+	LONG64 new_rev;
+	BOOLEAN is_newer = FALSE;
+	BOOLEAN is_success = FALSE;
+	NTSTATUS status;
+
+	*is_error_ptr = FALSE;
+
+	folder = (pbi->architecture == 64) ? L"Win_x64" : L"Win";
+	base_url = _r_format_string (CHROMIUM_SNAPSHOT_URL, folder);
+
+	if (!base_url)
+	{
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	last_change_url = _r_format_string (L"%sLAST_CHANGE", base_url->buffer);
+
+	if (!last_change_url)
+	{
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	proxy_string = _r_app_getproxyconfiguration ();
+	hsession = _r_inet_createsession (_r_app_getuseragent (), proxy_string);
+
+	if (!hsession)
+	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate_snapshot", GetLastError (), last_change_url->buffer);
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	_r_inet_initializedownload (&download_info, NULL, NULL, NULL);
+
+	status = _r_inet_begindownload (hsession, &last_change_url->sr, &download_info);
+
+	if (status != STATUS_SUCCESS)
+	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate_snapshot", status, last_change_url->buffer);
+		*is_error_ptr = TRUE;
+		_r_inet_destroydownload (&download_info);
+		goto CleanupExit;
+	}
+
+	if (_r_obj_isstringempty (download_info.string))
+	{
+		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+		*is_error_ptr = TRUE;
+		_r_inet_destroydownload (&download_info);
+		goto CleanupExit;
+	}
+
+	_r_obj_movereference ((PVOID_PTR)&content, download_info.string);
+	download_info.string = NULL;
+	_r_inet_destroydownload (&download_info);
+
+	rev_len = _app_release_revision_length (content->buffer);
+
+	if (!rev_len)
+	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate_snapshot", ERROR_INVALID_DATA, last_change_url->buffer);
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	new_rev_str = _r_obj_createstring_ex (content->buffer, rev_len * sizeof (WCHAR));
+
+	if (!new_rev_str)
+	{
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	_r_obj_movereference ((PVOID_PTR)&pbi->new_version, new_rev_str);
+	new_rev_str = NULL;
+
+	archive_url = _r_format_string (L"%s%s/chrome-win.zip", base_url->buffer, pbi->new_version->buffer);
+
+	if (!archive_url)
+	{
+		*is_error_ptr = TRUE;
+		goto CleanupExit;
+	}
+
+	_r_obj_movereference ((PVOID_PTR)&pbi->download_url, archive_url);
+	archive_url = NULL;
+
+	if (pbi->instance_id >= 2 && pbi->instance_id <= 4)
+		rev_key = _r_format_string (L"ChromiumSnapshotRevision%" TEXT (PR_LONG), pbi->instance_id);
+
+	stored_rev_str = _r_config_getstring (rev_key ? rev_key->buffer : L"ChromiumSnapshotRevision", NULL);
+
+	if (rev_key)
+	{
+		_r_obj_dereference (rev_key);
+		rev_key = NULL;
+	}
+
+	new_rev = _r_str_tolong64 (&pbi->new_version->sr);
+
+	if (!is_exists)
+	{
+		is_newer = TRUE;
+	}
+	else if (!stored_rev_str || _r_obj_isstringempty (stored_rev_str))
+	{
+		is_newer = TRUE;
+	}
+	else
+	{
+		current_rev = _r_str_tolong64 (&stored_rev_str->sr);
+
+		if (new_rev > current_rev)
+			is_newer = TRUE;
+	}
+
+	if (stored_rev_str)
+	{
+		_r_obj_dereference (stored_rev_str);
+		stored_rev_str = NULL;
+	}
+
+	_app_update_browser_info (hwnd, pbi);
+
+	is_success = is_newer;
+
+	if (is_exists && !is_success)
+	{
+		SAFE_DELETE_REFERENCE (pbi->download_url);
+		_app_set_lastcheck (pbi);
+	}
+
+CleanupExit:
+	_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
+
+	if (new_rev_str)
+		_r_obj_dereference (new_rev_str);
+
+	if (archive_url)
+		_r_obj_dereference (archive_url);
+
+	if (last_change_url)
+		_r_obj_dereference (last_change_url);
+
+	if (base_url)
+		_r_obj_dereference (base_url);
+
+	if (content)
+		_r_obj_dereference (content);
+
+	if (hsession)
+		_r_inet_close (hsession);
+
+	if (proxy_string)
+		_r_obj_dereference (proxy_string);
+
+	return is_success;
+}
+
 BOOLEAN _app_checkupdate (
 	_In_ HWND hwnd,
 	_In_ PBROWSER_INFORMATION pbi,
@@ -358,7 +580,7 @@ BOOLEAN _app_checkupdate (
 	PR_HASHTABLE hashtable = NULL;
 	R_DOWNLOAD_INFO download_info;
 	PR_STRING update_url;
-	PR_STRING url;
+	PR_STRING url = NULL;
 	HINTERNET hsession;
 	PR_STRING string;
 	PR_STRING proxy_string;
@@ -385,34 +607,77 @@ BOOLEAN _app_checkupdate (
 
 	if (!is_exists || is_updaterequired)
 	{
-		R_STRINGREF r3dfox_type = PR_STRINGREF_INIT (L"r3dfox");
-		R_STRINGREF iceweasel_type = PR_STRINGREF_INIT (L"iceweasel");
-		R_STRINGREF cromite_type = PR_STRINGREF_INIT (L"cromite");
-		R_STRINGREF ungoogled_type = PR_STRINGREF_INIT (L"ungoogled-chromium");
+		APP_BROWSER_KIND kind = _app_get_browser_kind (pbi->browser_type);
 
-		if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &r3dfox_type, TRUE))
-			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/Eclipse-Community/r3dfox/releases/latest", is_exists, FALSE, is_error_ptr);
+		if (kind == BROWSER_KIND_R3DFOX)
+			return _app_checkupdate_github_latest_release (hwnd, pbi, UPDATE_URL_R3DFOX, is_exists, RELEASE_POLICY_GENERIC, NULL, is_error_ptr);
 
-		if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &iceweasel_type, TRUE))
-			return _app_checkupdate_github_latest_release (hwnd, pbi, L"https://api.github.com/repos/adonais/iceweasel/releases/latest", is_exists, FALSE, is_error_ptr);
+		if (kind == BROWSER_KIND_ICEWEASEL)
+			return _app_checkupdate_github_latest_release (hwnd, pbi, UPDATE_URL_ICEWEASEL, is_exists, RELEASE_POLICY_GENERIC, NULL, is_error_ptr);
 
 		update_url = _r_config_getstring (L"ChromiumUpdateUrl", NULL);
 
-		if (!update_url)
+		if (update_url)
 		{
-			if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &ungoogled_type, TRUE))
-				return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_UNGOOGLED, is_exists, TRUE, is_error_ptr);
-
-			if (pbi->browser_type && _r_str_isequal (&pbi->browser_type->sr, &cromite_type, TRUE))
-				update_url = _r_obj_createstring (CHROMIUM_UPDATE_URL_CROMITE);
-			else
-				update_url = _r_obj_createstring (CHROMIUM_UPDATE_URL);
+			url = _r_format_string (update_url->buffer, pbi->architecture, pbi->browser_type ? pbi->browser_type->buffer : L"");
+			_r_obj_dereference (update_url);
+			update_url = NULL;
 		}
+		else
+		{
+			switch (kind)
+			{
+				case BROWSER_KIND_UNGOOGLED:
+				{
+					return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_UNGOOGLED, is_exists, RELEASE_POLICY_UNGOOGLED, NULL, is_error_ptr);
+				}
 
-		if (!update_url)
-			return FALSE;
+				case BROWSER_KIND_CROMITE:
+				{
+					url = _r_obj_createstring (CHROMIUM_UPDATE_URL_CROMITE);
+					break;
+				}
 
-		url = _r_format_string (update_url->buffer, pbi->architecture, pbi->browser_type->buffer);
+				case BROWSER_KIND_STABLE_CODECS_SYNC:
+				{
+					if (pbi->architecture != 64)
+					{
+						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_NOT_SUPPORTED, L"stable-codecs-sync provides 64-bit builds only");
+						*is_error_ptr = TRUE;
+						_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
+						return FALSE;
+					}
+
+					return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_HIBBIKI, is_exists, RELEASE_POLICY_HIBBIKI, NULL, is_error_ptr);
+				}
+
+				case BROWSER_KIND_DEV_NOSYNC:
+				{
+					if (pbi->architecture != 64)
+					{
+						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_NOT_SUPPORTED, L"dev-nosync provides 64-bit builds only");
+						*is_error_ptr = TRUE;
+						_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
+						return FALSE;
+					}
+
+					return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_ROBRICH, is_exists, RELEASE_POLICY_ROBRICH, L"-win64-avx2", is_error_ptr);
+				}
+
+				case BROWSER_KIND_DEV_OFFICIAL:
+				{
+					return _app_checkupdate_snapshot (hwnd, pbi, is_exists, is_error_ptr);
+				}
+
+				default:
+				{
+					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_checkupdate", ERROR_NOT_SUPPORTED, L"Unsupported ChromiumType");
+					*is_error_ptr = TRUE;
+					_app_setstatus (hwnd, pbi->htaskbar, pbi, NULL, 0, 0);
+					return FALSE;
+				}
+			}
+		}
 
 		if (url)
 		{
@@ -466,8 +731,6 @@ BOOLEAN _app_checkupdate (
 
 			_r_obj_dereference (url);
 		}
-
-		_r_obj_dereference (update_url);
 	}
 
 	if (hashtable)
@@ -535,10 +798,17 @@ BOOLEAN NTAPI _app_downloadupdate_callback (
 )
 {
 	PBROWSER_INFORMATION pbi;
+	LONG percent;
 
 	pbi = lparam;
 
-	_app_setstatus (pbi->hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_DOWNLOAD), total_written, total_length);
+	percent = total_length ? (LONG)(((ULONG64)total_written * 100) / total_length) : 0;
+
+	if (percent != pbi->progress_percent)
+	{
+		pbi->progress_percent = percent;
+		_app_setstatus (pbi->hwnd, pbi->htaskbar, pbi, _r_locale_getstring (IDS_STATUS_DOWNLOAD), total_written, total_length);
+	}
 
 	return TRUE;
 }
@@ -609,6 +879,8 @@ BOOLEAN _app_downloadupdate (
 				*is_error_ptr = TRUE;
 				break;
 			}
+
+			pbi->progress_percent = -1;
 
 			_r_inet_initializedownload (&download_info, hfile, &_app_downloadupdate_callback, pbi);
 

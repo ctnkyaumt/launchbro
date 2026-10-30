@@ -29,7 +29,8 @@ Settings:
 # Custom Chromium update URL (semicolon-separated download/version metadata):
 # By default, ungoogled-chromium uses upstream GitHub Windows releases.
 # An explicit URL overrides that source; other Chromium types retain their defaults.
-#ChromiumUpdateUrl=https://chromium.woolyss.com/api/v3/?os=windows&bit=%d&type=%s&out=string
+# The URL must return download=<url>;version=<x.y.z.w> (optional ;timestamp=<unix>), %d = 32/64, %s = ChromiumType.
+#ChromiumUpdateUrl=https://example.com/update?bit=%d&type=%s
 #ChromiumUpdateUrl=https://github.com/uazo/cromite/releases/latest/download/updateurl.txt
 
 # Command line for Chromium (string):
@@ -38,10 +39,6 @@ ChromiumCommandLine=--flag-switches-begin --user-data-dir=..\profile --no-defaul
 
 # Chromium executable file name (string):
 ChromiumBinary=chrome.exe
-
-# Chromium binaries directory (string):
-# Relative (to launchbro directory) or full path (env. variables supported).
-ChromiumDirectory=.\bin
 
 # Set Chromium binaries architecture (integer):
 #
@@ -78,25 +75,14 @@ ChromiumUpdateOnly=true
 # Type of Chromium builds:
 #
 # dev-official
-#	Official development builds from snapshots repository
-#	"storage.googleapis.com/chromium-browser-snapshots/index.html" (32/64 bit)
+#	Official development builds from Google snapshots repository (32/64, revision-tracked)
+#	"storage.googleapis.com/chromium-browser-snapshots/"
 #
 # stable-codecs-sync
-#	Unofficial stable builds with codecs
-#	"github.com/Hibbiki/chromium-win64/releases" (64 bit)
-#	"github.com/Hibbiki/chromium-win32/releases" (32 bit)
+#	Unofficial stable builds with codecs (github.com/Hibbiki/chromium-win64, 64-bit only)
 #
 # dev-nosync
-#	Unofficial development builds without Google services
-#	"github.com/RobRich999/Chromium_Clang/releases" (32/64 bit)
-#
-# dev-codecs-sync
-#	Unofficial development builds with codecs and without Google services
-#	"github.com/macchrome/winchrome/releases" (64 bit)
-#
-# dev-codecs-nosync
-#	Unofficial development builds with codecs and without Google services
-#	"github.com/macchrome/winchrome/releases" (64 bit)
+#	Unofficial development builds without Google services (github.com/RobRich999/Chromium_Clang, win64 AVX2, 64-bit only)
 #
 # ungoogled-chromium
 #	Unofficial builds without Google integration and enhanced privacy (based on Eloston project)
@@ -106,6 +92,9 @@ ChromiumUpdateOnly=true
 # cromite
 #	Unofficial builds based on Chromium with enhanced security and privacy
 #	"github.com/uazo/cromite/releases"
+#
+# r3dfox / iceweasel
+#	Firefox-based browsers supported as launcher + updater (portable releases via GitHub).
 ChromiumType=ungoogled-chromium
 
 # Check for new Chromium version once in X days (integer):

@@ -144,21 +144,10 @@ static PR_STRING _app_get_profile_label (
 	_In_ PR_STRING profile_dir
 )
 {
-	PR_STRING browser_type = NULL;
+	PR_STRING browser_type;
 	PR_STRING label;
 
-	if (instance_id >= 2 && instance_id <= 4)
-	{
-		PR_STRING type_key = _r_format_string (L"ChromiumType%" TEXT (PR_LONG), instance_id);
-		if (type_key)
-		{
-			browser_type = _r_config_getstring (type_key->buffer, NULL);
-			_r_obj_dereference (type_key);
-		}
-	}
-
-	if (!browser_type)
-		browser_type = _r_config_getstring (L"ChromiumType", L"chromium");
+	browser_type = _app_get_instance_type (instance_id, L"chromium");
 
 	label = _r_format_string (L"launchbro_profile%" TEXT (PR_LONG) L"_%s", instance_id, browser_type ? browser_type->buffer : L"chromium");
 
