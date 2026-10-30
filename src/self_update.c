@@ -408,6 +408,64 @@ BOOLEAN _app_download_self_update (
 	return is_success;
 }
 
+// cmd.exe reads batch files in the console OEM code page and cannot run a
+// UTF-16 script at all, so the wide buffer must be converted before writing.
+static BOOLEAN _app_write_batch_file (
+	_In_ PR_STRING bat_path,
+	_In_ PR_STRING bat_content
+)
+{
+	LPSTR buffer;
+	HANDLE hfile;
+	ULONG written;
+	BOOL is_defaultused = FALSE;
+	INT length;
+	BOOLEAN is_success = FALSE;
+	NTSTATUS status;
+
+	length = WideCharToMultiByte (CP_OEMCP, WC_NO_BEST_FIT_CHARS, bat_content->buffer, (INT)(bat_content->length / sizeof (WCHAR)), NULL, 0, NULL, NULL);
+
+	if (!length)
+		return FALSE;
+
+	buffer = _r_mem_allocate (length);
+
+	length = WideCharToMultiByte (CP_OEMCP, WC_NO_BEST_FIT_CHARS, bat_content->buffer, (INT)(bat_content->length / sizeof (WCHAR)), buffer, length, NULL, &is_defaultused);
+
+	// a path with characters the OEM code page cannot represent would turn
+	// into '?' and make the script operate on the wrong files
+	if (length && !is_defaultused)
+	{
+		status = _r_fs_createfile (
+			&bat_path->sr,
+			FILE_OVERWRITE_IF,
+			FILE_GENERIC_WRITE,
+			FILE_SHARE_READ,
+			FILE_ATTRIBUTE_NORMAL,
+			FILE_SEQUENTIAL_ONLY,
+			FALSE,
+			NULL,
+			&hfile
+		);
+
+		if (NT_SUCCESS (status))
+		{
+			if (WriteFile (hfile, buffer, (ULONG)length, &written, NULL) && written == (ULONG)length)
+				is_success = TRUE;
+
+			CloseHandle (hfile);
+		}
+	}
+	else
+	{
+		_r_log (LOG_LEVEL_ERROR, NULL, L"_app_write_batch_file", ERROR_NO_UNICODE_TRANSLATION, bat_path->buffer);
+	}
+
+	_r_mem_free (buffer);
+
+	return is_success;
+}
+
 static BOOLEAN _app_create_helper_bat (
 	_In_ PR_STRING zip_path,
 	_In_ PR_STRING app_root,
@@ -417,9 +475,6 @@ static BOOLEAN _app_create_helper_bat (
 {
 	PR_STRING bat_path;
 	PR_STRING bat_content;
-	HANDLE hfile;
-	ULONG written;
-	NTSTATUS status;
 	BOOLEAN is_success = FALSE;
 
 	bat_path = _r_format_string (L"%s\\_launchbro_update.bat", app_root->buffer);
@@ -429,11 +484,11 @@ static BOOLEAN _app_create_helper_bat (
 
 	bat_content = _r_format_string (
 		L"@echo off\r\n"
-		L"timeout /t 3 /nobreak >nul\r\n"
+		L"\"%%SystemRoot%%\\System32\\PING.EXE\" -n 4 127.0.0.1 >nul\r\n"
 		L":wait_loop\r\n"
 		L"tasklist | findstr /i \"launchbro.exe\" >nul\r\n"
 		L"if %%errorlevel%% == 0 (\r\n"
-		L"  timeout /t 1 /nobreak >nul\r\n"
+		L"  \"%%SystemRoot%%\\System32\\PING.EXE\" -n 2 127.0.0.1 >nul\r\n"
 		L"  goto wait_loop\r\n"
 		L")\r\n"
 		L"\r\n"
@@ -445,21 +500,19 @@ static BOOLEAN _app_create_helper_bat (
 		L"powershell -NoProfile -Command \"Expand-Archive -Path '%s' -DestinationPath '%%TEMP_EXTRACT%%' -Force\"\r\n"
 		L"if errorlevel 1 goto cleanup\r\n"
 		L"\r\n"
-		L"if exist \"%%TEMP_EXTRACT%%\\launchbro\" (\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\launchbro\\32\\*\" \"%%ROOT%%\\32\\\" >nul 2>&1\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\launchbro\\64\\*\" \"%%ROOT%%\\64\\\" >nul 2>&1\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\launchbro\\i18n\" \"%%ROOT%%\\i18n\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\launchbro\\*.ini\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\launchbro\\*.txt\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\launchbro\\*.lng\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L") else if exist \"%%TEMP_EXTRACT%%\\32\" (\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\32\\*\" \"%%ROOT%%\\32\\\" >nul 2>&1\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\64\\*\" \"%%ROOT%%\\64\\\" >nul 2>&1\r\n"
-		L"  xcopy /e /y /i \"%%TEMP_EXTRACT%%\\i18n\" \"%%ROOT%%\\i18n\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\*.ini\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\*.txt\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L"  copy /y \"%%TEMP_EXTRACT%%\\*.lng\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
-		L")\r\n"
+		L"set \"SRC=%%TEMP_EXTRACT%%\"\r\n"
+		L"if exist \"%%TEMP_EXTRACT%%\\launchbro\" set \"SRC=%%TEMP_EXTRACT%%\\launchbro\"\r\n"
+		L"if not exist \"%%SRC%%\\64\\launchbro.exe\" goto cleanup\r\n"
+		L"\r\n"
+		L"rem keep the user's existing configuration files\r\n"
+		L"for %%%%D in (\"\" \"\\32\" \"\\64\") do if exist \"%%ROOT%%%%%%~D\\launchbro.ini\" del /f /q \"%%SRC%%%%%%~D\\launchbro.ini\" >nul 2>&1\r\n"
+		L"\r\n"
+		L"xcopy /e /y /i \"%%SRC%%\\32\\*\" \"%%ROOT%%\\32\\\" >nul 2>&1\r\n"
+		L"xcopy /e /y /i \"%%SRC%%\\64\\*\" \"%%ROOT%%\\64\\\" >nul 2>&1\r\n"
+		L"if exist \"%%SRC%%\\i18n\" xcopy /e /y /i \"%%SRC%%\\i18n\" \"%%ROOT%%\\i18n\\\" >nul 2>&1\r\n"
+		L"copy /y \"%%SRC%%\\*.ini\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
+		L"copy /y \"%%SRC%%\\*.txt\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
+		L"copy /y \"%%SRC%%\\*.lng\" \"%%ROOT%%\\\" >nul 2>&1\r\n"
 		L"\r\n"
 		L":cleanup\r\n"
 		L"if exist \"%%TEMP_EXTRACT%%\" rmdir /s /q \"%%TEMP_EXTRACT%%\"\r\n"
@@ -476,25 +529,7 @@ static BOOLEAN _app_create_helper_bat (
 	if (!bat_content)
 		goto CleanupExit;
 
-	status = _r_fs_createfile (
-		&bat_path->sr,
-		FILE_OVERWRITE_IF,
-		FILE_GENERIC_WRITE,
-		FILE_SHARE_READ,
-		FILE_ATTRIBUTE_NORMAL,
-		FILE_SEQUENTIAL_ONLY,
-		FALSE,
-		NULL,
-		&hfile
-	);
-
-	if (!NT_SUCCESS (status))
-		goto CleanupExit;
-
-	if (WriteFile (hfile, bat_content->buffer, (ULONG)bat_content->length, &written, NULL))
-		is_success = TRUE;
-
-	CloseHandle (hfile);
+	is_success = _app_write_batch_file (bat_path, bat_content);
 
 CleanupExit:
 
@@ -523,6 +558,7 @@ VOID _app_apply_self_update (
 
 	if (!_app_create_helper_bat (zip_path, app_root, FALSE, NULL))
 	{
+		_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, _r_locale_getstring (IDS_UPDATE_ERROR));
 		_r_obj_dereference (app_root);
 		return;
 	}
@@ -591,9 +627,6 @@ VOID _app_perform_migration (
 	WCHAR parent_buf[4096] = {0};
 	PR_STRING bat_path = NULL;
 	PR_STRING bat_content = NULL;
-	HANDLE hfile;
-	ULONG written;
-	NTSTATUS status;
 	PWSTR slash_ptr;
 	SHELLEXECUTEINFOW sei = {0};
 
@@ -615,11 +648,11 @@ VOID _app_perform_migration (
 
 	bat_content = _r_format_string (
 		L"@echo off\r\n"
-		L"timeout /t 2 /nobreak >nul\r\n"
+		L"\"%%SystemRoot%%\\System32\\PING.EXE\" -n 3 127.0.0.1 >nul\r\n"
 		L":wait_loop\r\n"
 		L"tasklist | findstr /i \"launchbro.exe\" >nul\r\n"
 		L"if %%errorlevel%% == 0 (\r\n"
-		L"  timeout /t 1 /nobreak >nul\r\n"
+		L"  \"%%SystemRoot%%\\System32\\PING.EXE\" -n 2 127.0.0.1 >nul\r\n"
 		L"  goto wait_loop\r\n"
 		L")\r\n"
 		L"\r\n"
@@ -638,23 +671,11 @@ VOID _app_perform_migration (
 	if (!bat_content)
 		goto CleanupExit;
 
-	status = _r_fs_createfile (
-		&bat_path->sr,
-		FILE_OVERWRITE_IF,
-		FILE_GENERIC_WRITE,
-		FILE_SHARE_READ,
-		FILE_ATTRIBUTE_NORMAL,
-		FILE_SEQUENTIAL_ONLY,
-		FALSE,
-		NULL,
-		&hfile
-	);
-
-	if (!NT_SUCCESS (status))
+	if (!_app_write_batch_file (bat_path, bat_content))
+	{
+		_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, _r_locale_getstring (IDS_UPDATE_ERROR));
 		goto CleanupExit;
-
-	WriteFile (hfile, bat_content->buffer, (ULONG)bat_content->length, &written, NULL);
-	CloseHandle (hfile);
+	}
 
 	sei.cbSize = sizeof (sei);
 	sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;

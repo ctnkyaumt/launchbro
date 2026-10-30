@@ -5,7 +5,7 @@
 !include "LogicLib.nsh"
 
 !define APP_NAME "launchbro"
-!define APP_VERSION "2.9.13"
+!define APP_VERSION "2.9.14"
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "launchbro-setup.exe"
@@ -54,6 +54,13 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+    ; Clean up system changes before killing processes
+    ${If} ${FileExists} "$INSTDIR\64\launchbro.exe"
+        ExecWait '"$INSTDIR\64\launchbro.exe" /cleanup'
+    ${ElseIf} ${FileExists} "$INSTDIR\32\launchbro.exe"
+        ExecWait '"$INSTDIR\32\launchbro.exe" /cleanup'
+    ${EndIf}
+
     ; Close launchbro / chrlauncher and bundled browser processes from this install root
     ; (hidden window, broad error suppression - this used to flash a visible PowerShell
     ; console with red WMI/CIM error text since only Stop-Process had -ErrorAction set)
@@ -67,8 +74,21 @@ Section "Uninstall"
     ; Ask about profiles
     MessageBox MB_YESNO|MB_ICONQUESTION "Do you want to keep your browser profiles?" IDYES KeepProfiles
 
-    ; Delete everything
-    RMDir /r "$INSTDIR"
+    ; Delete only what launchbro owns
+    RMDir /r "$INSTDIR\32"
+    RMDir /r "$INSTDIR\64"
+    RMDir /r "$INSTDIR\i18n"
+    RMDir /r "$INSTDIR\_launchbro_new"
+    Delete "$INSTDIR\launchbro.ini"
+    Delete "$INSTDIR\launchbro.lng"
+    Delete "$INSTDIR\History.txt"
+    Delete "$INSTDIR\License.txt"
+    Delete "$INSTDIR\Readme.txt"
+    Delete "$INSTDIR\RegistryCleaner.reg"
+    Delete "$INSTDIR\SetDefaultBrowser.bat"
+    Delete "$INSTDIR\_launchbro_update.bat"
+    Delete "$INSTDIR\uninstall.exe"
+    RMDir "$INSTDIR"
     Goto CleanupRegistry
 
 KeepProfiles:
@@ -77,16 +97,19 @@ KeepProfiles:
     Delete "$INSTDIR\32\launchbro.exe"
     Delete "$INSTDIR\64\*.dll"
     Delete "$INSTDIR\32\*.dll"
+    Delete "$INSTDIR\launchbro.ini"
+    Delete "$INSTDIR\launchbro.lng"
+    Delete "$INSTDIR\History.txt"
+    Delete "$INSTDIR\License.txt"
+    Delete "$INSTDIR\Readme.txt"
+    Delete "$INSTDIR\RegistryCleaner.reg"
+    Delete "$INSTDIR\SetDefaultBrowser.bat"
+    Delete "$INSTDIR\_launchbro_update.bat"
     Delete "$INSTDIR\uninstall.exe"
-    Delete "$INSTDIR\*.ini"
-    Delete "$INSTDIR\*.lng"
-    Delete "$INSTDIR\*.txt"
-    Delete "$INSTDIR\*.reg"
-    Delete "$INSTDIR\*.bat"
     RMDir /r "$INSTDIR\i18n"
+    RMDir /r "$INSTDIR\_launchbro_new"
     ; bin and profile folders remain
 
 CleanupRegistry:
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 SectionEnd
-

@@ -102,6 +102,10 @@ VOID _app_parse_args (
 				{
 					pbi->is_bringtofront = TRUE;
 				}
+				else if (_app_is_exact_key (key2, L"cleanup", 7))
+				{
+					pbi->is_cleanup = TRUE;
+				}
 				else if (_app_is_exact_key (key2, L"forcecheck", 10))
 				{
 					pbi->is_forcecheck = TRUE;

@@ -621,15 +621,47 @@ static BOOLEAN _app_delete_directory_contents (
 	return is_success;
 }
 
+static PR_STRING _app_escape_powershell_path (
+	_In_ PR_STRING path
+)
+{
+	R_STRINGBUILDER sb;
+	ULONG_PTR len;
+
+	if (!path)
+		return NULL;
+
+	len = path->length / sizeof (WCHAR);
+
+	_r_obj_initializestringbuilder (&sb, (len + 16) * sizeof (WCHAR));
+
+	for (ULONG_PTR i = 0; i < len; i++)
+	{
+		WCHAR c = path->buffer[i];
+
+		if (c == L'\'')
+			_r_obj_appendstringbuilder_ex (&sb, L"''", 2 * sizeof (WCHAR));
+		else
+			_r_obj_appendstringbuilder_ex (&sb, &c, sizeof (WCHAR));
+	}
+
+	return _r_obj_finalstringbuilder (&sb);
+}
+
 VOID _app_uninstall_app (
 	_In_ HWND hwnd
 )
 {
+	static const BYTE utf16le_bom[] = {0xFF, 0xFE};
+
 	PR_STRING app_root;
 	PR_STRING temp_dir = NULL;
 	PR_STRING script_path = NULL;
 	PR_STRING script_params = NULL;
 	PR_STRING script_content = NULL;
+	PR_STRING escaped_root = NULL;
+	PR_STRING escaped_script = NULL;
+	LPCWSTR body;
 	HANDLE hfile;
 	ULONG written;
 	NTSTATUS status;
@@ -666,39 +698,15 @@ VOID _app_uninstall_app (
 	if (!script_path)
 		goto CleanupExit;
 
+	escaped_root = _app_escape_powershell_path (app_root);
+	escaped_script = _app_escape_powershell_path (script_path);
+
+	if (!escaped_root || !escaped_script)
+		goto CleanupExit;
+
 	if (keep_profiles)
 	{
-		script_content = _r_format_string (
-			L"$Root = '%s'\r\n"
-			L"$ScriptPath = '%s'\r\n"
-			L"Start-Sleep -Seconds 2\r\n"
-			L"$roots = @($Root)\r\n"
-			L"$legacy = Join-Path ([System.IO.Path]::GetDirectoryName($Root)) 'chrlauncher'\r\n"
-			L"if (Test-Path $legacy) { $roots += $legacy }\r\n"
-			L"Get-CimInstance Win32_Process | Where-Object {\r\n"
-			L"  $path = $_.ExecutablePath\r\n"
-			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
-			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
-			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
-			L"$wsh = New-Object -ComObject WScript.Shell\r\n"
-			L"foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'))) {\r\n"
-			L"  if (!$d -or !(Test-Path $d)) { continue }\r\n"
-			L"  Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {\r\n"
-			L"    try {\r\n"
-			L"      $t = $wsh.CreateShortcut($_.FullName).TargetPath\r\n"
-			L"      if ($t -and @($roots | Where-Object { $t.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {\r\n"
-			L"        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue\r\n"
-			L"      }\r\n"
-			L"    } catch {}\r\n"
-			L"  }\r\n"
-			L"}\r\n"
-			L"foreach ($h in @('HKCU:', 'HKLM:')) {\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroHTML') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroURL') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro.EXE') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-ItemProperty -LiteralPath ($h + '\\Software\\RegisteredApplications') -Name 'launchbro' -ErrorAction SilentlyContinue\r\n"
-			L"}\r\n"
+		body =
 			L"foreach ($arch in @('32', '64')) {\r\n"
 			L"  $archRoot = Join-Path $Root $arch\r\n"
 			L"  if (!(Test-Path $archRoot)) { continue }\r\n"
@@ -706,53 +714,64 @@ VOID _app_uninstall_app (
 			L"  Get-ChildItem -LiteralPath $archRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll' } | Remove-Item -Force -ErrorAction SilentlyContinue\r\n"
 			L"}\r\n"
 			L"Get-ChildItem -LiteralPath $Root -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe', '.dll', '.bat', '.ini', '.lng', '.txt' } | Remove-Item -Force -ErrorAction SilentlyContinue\r\n"
-			L"Remove-Item -LiteralPath (Join-Path $Root 'i18n') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"Start-Sleep -Milliseconds 500\r\n"
-			L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
-			app_root->buffer,
-			script_path->buffer
-		);
+			L"Remove-Item -LiteralPath (Join-Path $Root 'i18n') -Recurse -Force -ErrorAction SilentlyContinue\r\n";
 	}
 	else
 	{
-		script_content = _r_format_string (
-			L"$Root = '%s'\r\n"
-			L"$ScriptPath = '%s'\r\n"
-			L"Start-Sleep -Seconds 2\r\n"
-			L"$roots = @($Root)\r\n"
-			L"$legacy = Join-Path ([System.IO.Path]::GetDirectoryName($Root)) 'chrlauncher'\r\n"
-			L"if (Test-Path $legacy) { $roots += $legacy }\r\n"
-			L"Get-CimInstance Win32_Process | Where-Object {\r\n"
-			L"  $path = $_.ExecutablePath\r\n"
-			L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
-			L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
-			L"while (Get-Process launchbro -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 1 }\r\n"
-			L"$wsh = New-Object -ComObject WScript.Shell\r\n"
-			L"foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'))) {\r\n"
-			L"  if (!$d -or !(Test-Path $d)) { continue }\r\n"
-			L"  Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {\r\n"
+		body = L"Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue\r\n";
+	}
+
+	script_content = _r_format_string (
+		L"$Root = '%s'\r\n"
+		L"$ScriptPath = '%s'\r\n"
+		L"Start-Sleep -Seconds 2\r\n"
+		L"$roots = @($Root)\r\n"
+		L"$legacy = Join-Path ([System.IO.Path]::GetDirectoryName($Root)) 'chrlauncher'\r\n"
+		L"if (Test-Path $legacy) { $roots += $legacy }\r\n"
+		L"Get-CimInstance Win32_Process | Where-Object {\r\n"
+		L"  $path = $_.ExecutablePath\r\n"
+		L"  $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
+		L"} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }\r\n"
+		L"$deadline = (Get-Date).AddSeconds(30)\r\n"
+		L"while ((Get-Date) -lt $deadline) {\r\n"
+		L"  $running = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {\r\n"
+		L"    $path = $_.ExecutablePath\r\n"
+		L"    $path -and @($roots | Where-Object { $path.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0\r\n"
+		L"  })\r\n"
+		L"  if ($running.Count -eq 0) { break }\r\n"
+		L"  Start-Sleep -Seconds 1\r\n"
+		L"}\r\n"
+		L"$wsh = New-Object -ComObject WScript.Shell\r\n"
+		L"foreach ($d in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('CommonDesktopDirectory'))) {\r\n"
+		L"  if (!$d -or !(Test-Path $d)) { continue }\r\n"
+		L"  Get-ChildItem -LiteralPath $d -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {\r\n"
 			L"    try {\r\n"
 			L"      $t = $wsh.CreateShortcut($_.FullName).TargetPath\r\n"
 			L"      if ($t -and @($roots | Where-Object { $t.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {\r\n"
 			L"        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue\r\n"
 			L"      }\r\n"
 			L"    } catch {}\r\n"
-			L"  }\r\n"
-			L"}\r\n"
-			L"foreach ($h in @('HKCU:', 'HKLM:')) {\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroHTML') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroURL') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro.EXE') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"  Remove-ItemProperty -LiteralPath ($h + '\\Software\\RegisteredApplications') -Name 'launchbro' -ErrorAction SilentlyContinue\r\n"
-			L"}\r\n"
-			L"Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue\r\n"
-			L"Start-Sleep -Milliseconds 500\r\n"
-			L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
-			app_root->buffer,
-			script_path->buffer
-		);
-	}
+		L"  }\r\n"
+		L"}\r\n"
+		L"foreach ($h in @('HKCU:', 'HKLM:')) {\r\n"
+		L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroHTML') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"  Remove-Item -LiteralPath ($h + '\\Software\\Classes\\launchbroURL') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"  Remove-Item -LiteralPath ($h + '\\Software\\Clients\\StartMenuInternet\\launchbro.EXE') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"  Remove-ItemProperty -LiteralPath ($h + '\\Software\\RegisteredApplications') -Name 'launchbro' -ErrorAction SilentlyContinue\r\n"
+		L"}\r\n"
+		L"Remove-Item -LiteralPath 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\launchbro' -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"$programs = [Environment]::GetFolderPath('Programs')\r\n"
+		L"if ($programs) {\r\n"
+		L"  Remove-Item -LiteralPath (Join-Path $programs 'launchbro') -Recurse -Force -ErrorAction SilentlyContinue\r\n"
+		L"}\r\n"
+		L"%s"
+		L"Start-Sleep -Milliseconds 500\r\n"
+		L"Remove-Item -LiteralPath $ScriptPath -Force -ErrorAction SilentlyContinue\r\n",
+		escaped_root->buffer,
+		escaped_script->buffer,
+		body
+	);
 
 	if (!script_content)
 		goto CleanupExit;
@@ -770,10 +789,26 @@ VOID _app_uninstall_app (
 	);
 
 	if (!NT_SUCCESS (status))
+	{
+		_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, L"Uninstall failed.");
 		goto CleanupExit;
+	}
 
-	WriteFile (hfile, script_content->buffer, (ULONG)script_content->length, &written, NULL);
-	CloseHandle (hfile);
+	{
+		BOOLEAN bom_ok = WriteFile (hfile, utf16le_bom, sizeof (utf16le_bom), &written, NULL) && (written == sizeof (utf16le_bom));
+		BOOLEAN content_ok = FALSE;
+
+		if (bom_ok)
+			content_ok = WriteFile (hfile, script_content->buffer, (ULONG)script_content->length, &written, NULL) && (written == (ULONG)script_content->length);
+
+		CloseHandle (hfile);
+
+		if (!bom_ok || !content_ok)
+		{
+			_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, L"Uninstall failed.");
+			goto CleanupExit;
+		}
+	}
 
 	// Delete scheduled task if present
 	_app_taskupdate_deletetask ();
@@ -802,6 +837,12 @@ VOID _app_uninstall_app (
 
 CleanupExit:
 
+	if (escaped_script)
+		_r_obj_dereference (escaped_script);
+
+	if (escaped_root)
+		_r_obj_dereference (escaped_root);
+
 	if (script_content)
 		_r_obj_dereference (script_content);
 
@@ -816,5 +857,51 @@ CleanupExit:
 
 	if (app_root)
 		_r_obj_dereference (app_root);
+}
+
+VOID _app_cleanup_system_changes (VOID)
+{
+	static LPCWSTR reg_keys[] = {
+		L"Software\\Classes\\launchbroHTML",
+		L"Software\\Classes\\launchbroURL",
+		L"Software\\Clients\\StartMenuInternet\\launchbro",
+		L"Software\\Clients\\StartMenuInternet\\launchbro.EXE",
+	};
+
+	_app_taskupdate_deletetask ();
+	_app_unpatch_registry_associations ();
+
+	for (LONG instance_id = 1; instance_id <= 4; instance_id++)
+	{
+		BROWSER_INFORMATION instance_info = {0};
+		PR_STRING shortcut_path;
+
+		if (!_app_is_instance_configured (instance_id))
+			continue;
+
+		instance_info.instance_id = instance_id;
+		instance_info.architecture = 0;
+
+		_app_init_browser_info (&instance_info);
+
+		shortcut_path = _app_get_shortcut_path (&instance_info);
+
+		if (shortcut_path)
+		{
+			if (_r_fs_exists (&shortcut_path->sr))
+				_r_fs_deletefile (&shortcut_path->sr, NULL);
+
+			_r_obj_dereference (shortcut_path);
+		}
+
+		_app_clear_browser_info_references (&instance_info);
+	}
+
+	for (ULONG_PTR i = 0; i < RTL_NUMBER_OF (reg_keys); i++)
+	{
+		RegDeleteTreeW (HKEY_CURRENT_USER, reg_keys[i]);
+	}
+
+	RegDeleteKeyValueW (HKEY_CURRENT_USER, L"Software\\RegisteredApplications", L"launchbro");
 }
 

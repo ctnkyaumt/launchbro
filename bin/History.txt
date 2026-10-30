@@ -1,3 +1,10 @@
+v2.9.14 (30 October 2026)
+- fixed launchbro's self-update never completing: the helper script was written as UTF-16, which cmd.exe cannot run, so "updated, restarting" was shown but nothing was replaced and launchbro did not restart. Versions up to 2.9.13 need one manual update to this release.
+- self-update no longer overwrites your launchbro.ini files with the defaults from the release package.
+- fixed the in-app uninstall doing nothing beyond removing the scheduled task (its PowerShell script had the same encoding problem); it now also removes the installer's Apps & features entry and Start Menu folder, handles folders containing an apostrophe, and only waits for processes from this install.
+- the setup uninstaller now deletes only launchbro's own files and folders instead of the whole install directory, and also removes the scheduled task, desktop shortcuts and launchbro's registry entries (new /cleanup switch).
+- fixed the chrlauncher migration helper script having the same encoding problem.
+
 v2.9.13 (30 October 2026)
 - replaced the shut-down Woolyss update service: stable-codecs-sync now updates from Hibbiki/chromium-win64, dev-nosync from RobRich999/Chromium_Clang (win64 AVX2) and dev-official from Google's Chromium snapshots (revision-tracked); the footer link now points to ungoogled-chromium releases.
 - removed the dev-codecs-sync and dev-codecs-nosync build types (no longer published upstream) and the ignored ChromiumDirectory setting from the docs.

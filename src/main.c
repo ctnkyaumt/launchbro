@@ -1347,6 +1347,14 @@ INT APIENTRY wWinMain (
 	{
 		_app_init_browser_info (&browser_info);
 
+		if (browser_info.is_cleanup)
+		{
+			_app_cleanup_system_changes ();
+			_app_clear_browser_info_references (&browser_info);
+
+			return ERROR_SUCCESS;
+		}
+
 		if (browser_info.is_hasurls && _r_fs_exists (&browser_info.binary_path->sr))
 		{
 			_app_openbrowser (&browser_info);

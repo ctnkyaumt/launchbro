@@ -70,6 +70,7 @@ typedef struct _BROWSER_INFORMATION
 
 	BOOLEAN is_autodownload;
 	BOOLEAN is_bringtofront;
+	BOOLEAN is_cleanup;
 	BOOLEAN is_deletetorecycle;
 	BOOLEAN is_forcecheck;
 	BOOLEAN is_forcedownload;
@@ -81,6 +82,10 @@ typedef struct _BROWSER_INFORMATION
 	BOOLEAN is_taskupdate;
 	BOOLEAN is_waitdownloadend;
 } BROWSER_INFORMATION, *PBROWSER_INFORMATION;
+
+VOID _app_init_browser_info (
+	_Inout_ PBROWSER_INFORMATION pbi
+);
 
 APP_BROWSER_KIND _app_get_browser_kind (
 	_In_opt_ PR_STRING browser_type
@@ -196,4 +201,18 @@ VOID _app_import_profile (
 
 VOID _app_uninstall_app (
 	_In_ HWND hwnd
+);
+
+VOID _app_cleanup_system_changes (VOID);
+
+PR_STRING _app_get_shortcut_path (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
+BOOLEAN _app_is_instance_configured (
+	_In_ LONG instance_id
+);
+
+VOID _app_clear_browser_info_references (
+	_Inout_ PBROWSER_INFORMATION pbi
 );
