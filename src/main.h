@@ -14,7 +14,9 @@ DEFINE_GUID (GUID_TrayIcon, 0xEAD41630, 0x90BB, 0x4836, 0x82, 0x41, 0xAE, 0xAE, 
 #define LANG_MENU 6
 
 #define FOOTER_STRING L"<a href=\"https://github.com/ctnkyaumt\">github.com/ctnkyaumt</a>\r\n" \
-	L"<a href=\"https://github.com/ungoogled-software/ungoogled-chromium-windows/releases\">ungoogled-chromium</a>"
+	L"<a href=\"https://github.com/macchrome/winchrome/releases\">ungoogled (64-bit)</a> / <a href=\"https://github.com/ungoogled-software/ungoogled-chromium-windows/releases\">(32-bit)</a>"
+
+#define CHROMIUM_UPDATE_URL_MACCHROME L"https://api.github.com/repos/macchrome/winchrome/releases?per_page=20"
 
 #define CHROMIUM_UPDATE_URL_CROMITE L"https://github.com/uazo/cromite/releases/latest/download/updateurl.txt"
 #define CHROMIUM_UPDATE_URL_UNGOOGLED L"https://api.github.com/repos/ungoogled-software/ungoogled-chromium-windows/releases/latest"
@@ -131,6 +133,15 @@ BOOLEAN _app_is_registry_patched (
 );
 
 BOOLEAN _app_patch_registry_profile (
+	_In_ PBROWSER_INFORMATION pbi
+);
+
+VOID _app_set_update_failed (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ BOOLEAN is_failed
+);
+
+BOOLEAN _app_get_update_failed (
 	_In_ PBROWSER_INFORMATION pbi
 );
 

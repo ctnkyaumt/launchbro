@@ -1,3 +1,9 @@
+v2.9.16 (2 November 2026)
+- switched 64-bit ungoogled-chromium update source back to macchrome/winchrome (7z portable releases), keeping ungoogled-software for 32-bit builds.
+- fixed "Check for update" button staying disabled when launching with update check disabled (ChromiumCheckPeriod=0); clicking it now forces an immediate update check.
+- retry a failed scheduled task update on the next normal browser launch instead of waiting 14 days for the next scheduled run.
+- fixed empty build date displaying "01/01/1970 03:00"; now displays not found when timestamp is zero.
+
 v2.9.15 (2 November 2026)
 - fixed truncated downloads being accepted as complete when network connection drops mid-transfer: verify bytes written match Content-Length and retry failed downloads.
 - detect archive format by signature (zip / 7z) before extracting, preventing corrupt or incomplete zip archives from falling back to 7-zip and showing misleading SzArEx_Open errors.

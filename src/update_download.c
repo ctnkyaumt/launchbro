@@ -191,7 +191,84 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 	download_info.string = NULL;
 	_r_inet_destroydownload (&download_info);
 
-	if (tag_suffix)
+	if (policy == RELEASE_POLICY_MACCHROME)
+	{
+		LPCWSTR search = json->buffer;
+
+		while ((search = wcsstr (search, L"\"tag_name\"")) != NULL)
+		{
+			PR_STRING candidate_tag = _app_json_find_string_value (search, L"tag_name");
+			LPCWSTR next_search = wcsstr (search + 10, L"\"tag_name\"");
+			LPCWSTR rel_limit = next_search ? next_search : (json->buffer + (json->length / sizeof (WCHAR)));
+			WCHAR ver_buf[32];
+
+			if (candidate_tag)
+			{
+				BOOLEAN is_prerelease = FALSE;
+				LPCWSTR pre_ptr = wcsstr (search, L"\"prerelease\"");
+
+				if (pre_ptr && pre_ptr < rel_limit)
+				{
+					LPCWSTR colon_ptr = wcschr (pre_ptr, L':');
+					if (colon_ptr && colon_ptr < rel_limit)
+					{
+						LPCWSTR val_ptr = _app_json_skip_whitespace (colon_ptr + 1);
+						if (val_ptr && wcsncmp (val_ptr, L"true", 4) == 0)
+							is_prerelease = TRUE;
+					}
+				}
+
+				if (!is_prerelease && _app_release_macchrome_tag_version (candidate_tag->buffer, ver_buf, RTL_NUMBER_OF (ver_buf)))
+				{
+					assets_ptr = wcsstr (search, L"\"assets\"");
+
+					if (assets_ptr && assets_ptr < rel_limit)
+					{
+						LPCWSTR p = assets_ptr;
+						BOOLEAN has_matching_asset = FALSE;
+
+						while ((p = wcsstr (p, L"\"name\"")) != NULL && p < rel_limit)
+						{
+							PR_STRING asset_name = _app_json_find_string_value (p, L"name");
+
+							if (asset_name)
+							{
+								if (_app_release_asset_score (asset_name->buffer, pbi->architecture, policy) > 0)
+									has_matching_asset = TRUE;
+
+								_r_obj_dereference (asset_name);
+							}
+
+							if (has_matching_asset)
+								break;
+
+							p += 6;
+						}
+
+						if (has_matching_asset)
+						{
+							assets_limit = rel_limit;
+							tag_name = _r_obj_createstring (ver_buf);
+							_r_obj_dereference (candidate_tag);
+							break;
+						}
+					}
+				}
+
+				_r_obj_dereference (candidate_tag);
+			}
+
+			search += 10;
+		}
+
+		if (!tag_name)
+		{
+			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
+			*is_error_ptr = TRUE;
+			goto CleanupExit;
+		}
+	}
+	else if (tag_suffix)
 	{
 		LPCWSTR search = json->buffer;
 
@@ -629,6 +706,9 @@ BOOLEAN _app_checkupdate (
 			{
 				case BROWSER_KIND_UNGOOGLED:
 				{
+					if (pbi->architecture == 64)
+						return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_MACCHROME, is_exists, RELEASE_POLICY_MACCHROME, NULL, is_error_ptr);
+
 					return _app_checkupdate_github_latest_release (hwnd, pbi, CHROMIUM_UPDATE_URL_UNGOOGLED, is_exists, RELEASE_POLICY_UNGOOGLED, NULL, is_error_ptr);
 				}
 

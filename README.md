@@ -61,7 +61,7 @@ There is list of arguments overrides .ini options
 [launchbro]
 
 # Custom Chromium update URL (semicolon-separated download/version metadata):
-# By default, ungoogled-chromium uses upstream GitHub Windows releases.
+# By default, ungoogled-chromium uses macchrome/winchrome (64-bit) and ungoogled-software (32-bit).
 # An explicit URL overrides that source; other Chromium types retain their defaults.
 # The URL must return download=<url>;version=<x.y.z.w> (optional ;timestamp=<unix>), %d = 32/64, %s = ChromiumType.
 #ChromiumUpdateUrl=https://example.com/update?bit=%d&type=%s
@@ -128,7 +128,8 @@ ChromiumUpdateOnly=true
 #
 # ungoogled-chromium
 #	Unofficial builds without Google integration and enhanced privacy (based on Eloston project)
-#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32/64 bit)
+#	"github.com/macchrome/winchrome/releases" (64 bit)
+#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32 bit)
 #	"github.com/Eloston/ungoogled-chromium"
 #
 # cromite
@@ -180,4 +181,4 @@ ChromiumDeleteToRecycle=true
 ### Building and testing:
 Build with Visual Studio C++ and the Windows SDK. Clone `henrypp/routine` beside this repository, then build `launchbro.vcxproj` (VS 2022: `/p:PlatformToolset=v143`). Run `powershell -File tests/run.ps1` for release asset and version regression checks. The build-zip and release workflows run these checks for every build.
 
-On first launch, a missing browser is downloaded even with `ChromiumAutoDownload=false` and `ChromiumCheckPeriod=0`. The default ungoogled-chromium source is the upstream Windows GitHub release, selecting a portable ZIP for the configured architecture. Explicit `ChromiumUpdateUrl` values still use the existing semicolon-separated metadata format. Update-check failures include the failing URL and error code in `launchbro_debug.log`.
+On first launch, a missing browser is downloaded even with `ChromiumAutoDownload=false` and `ChromiumCheckPeriod=0`. The default ungoogled-chromium source is macchrome/winchrome (64-bit 7z) and upstream ungoogled-software (32-bit zip), selecting a portable archive for the configured architecture. Explicit `ChromiumUpdateUrl` values still use the existing semicolon-separated metadata format. Update-check failures include the failing URL and error code in `launchbro_debug.log`.

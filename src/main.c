@@ -507,6 +507,12 @@ VOID _app_thread_check (
 
 	if (is_stayopen)
 	{
+		locale_id = _app_getactionid (pbi);
+
+		_r_ctrl_setstring (hwnd, IDC_START_BTN, _r_locale_getstring (locale_id));
+
+		_r_ctrl_enable (hwnd, IDC_START_BTN, TRUE);
+
 		_app_update_browser_info (hwnd, pbi);
 	}
 	else
@@ -1242,6 +1248,7 @@ INT_PTR CALLBACK DlgProc (
 					// manual click: user explicitly wants to advance the pipeline
 					// (download an already-found update even when the browser is
 					// installed and auto-download is off).
+					browser_info.is_forcecheck = TRUE;
 					browser_info.is_forcedownload = TRUE;
 
 					_r_workqueue_queueitem (&workqueue, &_app_thread_check, &browser_info);

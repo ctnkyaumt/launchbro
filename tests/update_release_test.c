@@ -77,6 +77,19 @@ int main (void)
 	assert (_app_archive_detect_format (doctype_hdr, 0) == APP_ARCHIVE_FORMAT_UNKNOWN);
 	assert (_app_archive_detect_format (short_hdr, sizeof (short_hdr)) == APP_ARCHIVE_FORMAT_UNKNOWN);
 
-	puts ("54 release asset/version/download regression checks passed.");
+	assert (_app_release_asset_score (L"ungoogled-chromium-156.0.8078.84-1_Win64.7z", 64, RELEASE_POLICY_MACCHROME) > 0);
+	assert (_app_release_asset_score (L"156.0.8078.84_ungoogled_mini_installer.exe", 64, RELEASE_POLICY_MACCHROME) < 0);
+	assert (_app_release_asset_score (L"idi.amin.png", 64, RELEASE_POLICY_MACCHROME) < 0);
+	assert (_app_release_asset_score (L"ungoogled-chromium-156.0.8078.84-1_Win64.7z", 32, RELEASE_POLICY_MACCHROME) < 0);
+	assert (_app_release_asset_score (NULL, 64, RELEASE_POLICY_MACCHROME) < 0);
+
+	wchar_t macchrome_ver[32];
+	assert (_app_release_macchrome_tag_version (L"v156.8078.84-M156.0.8078.84-r1706539-Win64", macchrome_ver, sizeof (macchrome_ver) / sizeof (macchrome_ver[0])));
+	assert (wcscmp (macchrome_ver, L"156.0.8078.84") == 0);
+	assert (_app_release_macchrome_tag_version (L"156.8078.48-M156.0.8078.48-r1706539-Win64", macchrome_ver, sizeof (macchrome_ver) / sizeof (macchrome_ver[0])));
+	assert (wcscmp (macchrome_ver, L"156.0.8078.48") == 0);
+	assert (_app_release_macchrome_tag_version (L"v150.7871.256", macchrome_ver, sizeof (macchrome_ver) / sizeof (macchrome_ver[0])) == 0);
+
+	puts ("64 release asset/version/download regression checks passed.");
 	return 0;
 }

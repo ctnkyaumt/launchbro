@@ -49,6 +49,7 @@ enum
 	RELEASE_POLICY_UNGOOGLED,
 	RELEASE_POLICY_HIBBIKI,
 	RELEASE_POLICY_ROBRICH,
+	RELEASE_POLICY_MACCHROME,
 };
 
 static int _app_release_contains (const wchar_t* text, const wchar_t* needle)
@@ -169,6 +170,17 @@ static int _app_release_asset_score (const wchar_t* name, int architecture, int 
 		return _app_release_endswith (name, architecture == 64 ? L"_windows_x64.zip" : L"_windows_x86.zip") ? 10 : -1;
 	}
 
+	if (policy == RELEASE_POLICY_MACCHROME)
+	{
+		if (architecture != 64)
+			return -1;
+
+		if (wcsncmp (name, L"ungoogled-chromium-", 19) != 0)
+			return -1;
+
+		return _app_release_endswith (name, L"_Win64.7z") ? 10 : -1;
+	}
+
 	if (_app_release_endswith (name, L".zip"))
 		score = 10;
 	else if (_app_release_endswith (name, L".7z"))
@@ -214,4 +226,39 @@ static size_t _app_release_chromium_version_length (const wchar_t* tag)
 	}
 
 	return tag[i] == L'\0' || tag[i] == L'-' ? i : 0;
+}
+
+static int _app_release_macchrome_tag_version (const wchar_t* tag, wchar_t* buffer, size_t buffer_count)
+{
+	const wchar_t* p;
+	size_t len;
+	size_t i;
+
+	if (!tag)
+		return 0;
+
+	p = wcsstr (tag, L"-M");
+
+	if (!p)
+		return 0;
+
+	p += 2;
+
+	len = _app_release_chromium_version_length (p);
+
+	if (!len)
+		return 0;
+
+	if (buffer)
+	{
+		if (buffer_count <= len)
+			return 0;
+
+		for (i = 0; i < len; i++)
+			buffer[i] = p[i];
+
+		buffer[len] = L'\0';
+	}
+
+	return (int)len;
 }

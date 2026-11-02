@@ -217,17 +217,30 @@ VOID _app_thread_taskupdate_all (
 			continue;
 
 		BOOLEAN was_installed = _r_fs_exists (&pbi->binary_path->sr);
+		BOOLEAN is_installed_now = FALSE;
 
 		if (!_app_isupdatedownloaded (pbi))
 		{
+			// FALSE without an error means "up to date" (_app_set_lastcheck already cleared the flag)
 			if (!_app_checkupdate (hwnd, pbi, &is_haveerror) || is_haveerror)
+			{
+				if (is_haveerror)
+					_app_set_update_failed (pbi, TRUE);
+
 				continue;
+			}
 
 			if (!_app_ishaveupdate (pbi))
+			{
+				_app_set_update_failed (pbi, FALSE);
 				continue;
+			}
 
 			if (!_app_downloadupdate (hwnd, pbi, &is_haveerror) || is_haveerror)
+			{
+				_app_set_update_failed (pbi, TRUE);
 				continue;
+			}
 		}
 
 		_app_taskupdate_closebrowser (pbi, &was_running[instance_id - 1]);
@@ -240,6 +253,7 @@ VOID _app_thread_taskupdate_all (
 				{
 					_app_set_lastcheck (pbi);
 					_app_maybe_create_shortcut (pbi, !was_installed);
+					is_installed_now = TRUE;
 				}
 
 				break;
@@ -247,6 +261,9 @@ VOID _app_thread_taskupdate_all (
 
 			Sleep (2000);
 		}
+
+		if (!is_installed_now)
+			_app_set_update_failed (pbi, TRUE);
 	}
 
 	for (LONG instance_id = 1; instance_id <= 4; instance_id++)

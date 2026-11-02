@@ -6,6 +6,46 @@
 #include "main.h"
 #include "rapp.h"
 
+VOID _app_set_update_failed (
+	_In_ PBROWSER_INFORMATION pbi,
+	_In_ BOOLEAN is_failed
+)
+{
+	PR_STRING key = NULL;
+
+	if (!pbi)
+		return;
+
+	if (pbi->instance_id > 1)
+		key = _r_format_string (L"ChromiumUpdateFailed%" TEXT (PR_LONG), pbi->instance_id);
+
+	_r_config_setboolean (key ? key->buffer : L"ChromiumUpdateFailed", is_failed);
+
+	if (key)
+		_r_obj_dereference (key);
+}
+
+BOOLEAN _app_get_update_failed (
+	_In_ PBROWSER_INFORMATION pbi
+)
+{
+	PR_STRING key = NULL;
+	BOOLEAN is_failed;
+
+	if (!pbi)
+		return FALSE;
+
+	if (pbi->instance_id > 1)
+		key = _r_format_string (L"ChromiumUpdateFailed%" TEXT (PR_LONG), pbi->instance_id);
+
+	is_failed = _r_config_getboolean (key ? key->buffer : L"ChromiumUpdateFailed", FALSE);
+
+	if (key)
+		_r_obj_dereference (key);
+
+	return is_failed;
+}
+
 VOID _app_set_lastcheck (
 	_In_ PBROWSER_INFORMATION pbi
 )
@@ -22,6 +62,8 @@ VOID _app_set_lastcheck (
 		lastcheck_key = _r_format_string (L"ChromiumLastCheck%" TEXT (PR_LONG), pbi->instance_id);
 
 	_r_config_setlong64 (lastcheck_key ? lastcheck_key->buffer : L"ChromiumLastCheck", timestamp);
+
+	_app_set_update_failed (pbi, FALSE);
 
 	if (lastcheck_key)
 		_r_obj_dereference (lastcheck_key);

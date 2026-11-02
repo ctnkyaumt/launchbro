@@ -27,7 +27,7 @@ Settings:
 [launchbro]
 
 # Custom Chromium update URL (semicolon-separated download/version metadata):
-# By default, ungoogled-chromium uses upstream GitHub Windows releases.
+# By default, ungoogled-chromium uses macchrome/winchrome (64-bit) and ungoogled-software (32-bit).
 # An explicit URL overrides that source; other Chromium types retain their defaults.
 # The URL must return download=<url>;version=<x.y.z.w> (optional ;timestamp=<unix>), %d = 32/64, %s = ChromiumType.
 #ChromiumUpdateUrl=https://example.com/update?bit=%d&type=%s
@@ -86,7 +86,8 @@ ChromiumUpdateOnly=true
 #
 # ungoogled-chromium
 #	Unofficial builds without Google integration and enhanced privacy (based on Eloston project)
-#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32/64 bit)
+#	"github.com/macchrome/winchrome/releases" (64 bit)
+#	"github.com/ungoogled-software/ungoogled-chromium-windows/releases" (32 bit)
 #	"github.com/Eloston/ungoogled-chromium"
 #
 # cromite

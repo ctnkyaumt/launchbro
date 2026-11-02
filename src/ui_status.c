@@ -21,7 +21,7 @@ VOID _app_update_browser_info (
 
 	_r_obj_initializestringref (&empty_string, string);
 
-	date_dormat = _r_format_unixtime (pbi->timestamp, FDTF_SHORTDATE | FDTF_SHORTTIME);
+	date_dormat = (pbi->timestamp != 0) ? _r_format_unixtime (pbi->timestamp, FDTF_SHORTDATE | FDTF_SHORTTIME) : NULL;
 
 	localized_string = _r_format_string (L"%s:", _r_locale_getstring (IDS_BROWSER));
 

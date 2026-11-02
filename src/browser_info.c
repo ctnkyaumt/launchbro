@@ -769,6 +769,9 @@ VOID _app_init_browser_info (
 
 	pbi->check_period = _r_config_getlong (L"ChromiumCheckPeriod", 0);
 
+	if (!pbi->is_taskupdate && _app_get_update_failed (pbi))
+		pbi->is_forcecheck = TRUE;
+
 	if (pbi->check_period == INT_ERROR)
 		pbi->is_forcecheck = TRUE;
 
