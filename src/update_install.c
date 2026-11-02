@@ -6,6 +6,9 @@
 #include "main.h"
 #include "rapp.h"
 
+#include "resource.h"
+#include "update_release.h"
+
 #include "CpuArch.h"
 
 #include "7z.h"
@@ -98,7 +101,7 @@ SRes _app_unpack_7zip (
 
 	if (status != ERROR_SUCCESS)
 	{
-		_r_show_errormessage (hwnd, NULL, status, pbi->cache_path->buffer, ET_WINDOWS);
+		_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, pbi->cache_path->buffer, ET_WINDOWS);
 
 		return status;
 	}
@@ -112,7 +115,7 @@ SRes _app_unpack_7zip (
 
 	if (!look_stream.buf)
 	{
-		_r_show_errormessage (hwnd, NULL, STATUS_NO_MEMORY, L"ISzAlloc_Alloc", ET_NATIVE);
+		_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), STATUS_NO_MEMORY, L"ISzAlloc_Alloc", ET_NATIVE);
 
 		goto CleanupExit;
 	}
@@ -128,7 +131,7 @@ SRes _app_unpack_7zip (
 
 	if (status != SZ_OK)
 	{
-		_r_show_errormessage (hwnd, NULL, status, L"SzArEx_Open", ET_NONE);
+		_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT_CORRUPT), status, L"SzArEx_Open", ET_NONE);
 
 		goto CleanupExit;
 	}
@@ -188,7 +191,7 @@ SRes _app_unpack_7zip (
 		if (!_app_is_entry_path_safe (temp_buff))
 		{
 			status = SZ_ERROR_DATA;
-			_r_show_errormessage (hwnd, NULL, status, L"Invalid archive path", ET_NONE);
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, L"Invalid archive path", ET_NONE);
 			break;
 		}
 
@@ -246,7 +249,7 @@ SRes _app_unpack_7zip (
 
 			if (status != SZ_OK)
 			{
-				_r_show_errormessage (hwnd, NULL, status, L"SzArEx_Extract", ET_NONE);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, L"SzArEx_Extract", ET_NONE);
 				_r_obj_dereference (dest_path);
 				break;
 			}
@@ -256,7 +259,7 @@ SRes _app_unpack_7zip (
 			if (status != SZ_OK)
 			{
 				if (status != SZ_ERROR_CRC)
-					_r_show_errormessage (hwnd, NULL, status, L"OutFile_OpenW", ET_NONE);
+					_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, L"OutFile_OpenW", ET_NONE);
 				_r_obj_dereference (dest_path);
 				break;
 			}
@@ -270,7 +273,7 @@ SRes _app_unpack_7zip (
 				if (status == SZ_OK)
 					status = SZ_ERROR_WRITE;
 
-				_r_show_errormessage (hwnd, NULL, status, L"File_Write", ET_NONE);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, L"File_Write", ET_NONE);
 				File_Close (&out_file);
 				_r_obj_dereference (dest_path);
 				break;
@@ -321,8 +324,7 @@ CleanupExit:
 BOOLEAN _app_unpack_zip (
 	_In_ HWND hwnd,
 	_In_ PBROWSER_INFORMATION pbi,
-	_In_ PR_STRINGREF bin_name,
-	_Out_opt_ PBOOLEAN is_not_zip_ptr
+	_In_ PR_STRINGREF bin_name
 )
 {
 	static R_STRINGREF separator_sr = PR_STRINGREF_INIT (L"\\");
@@ -344,14 +346,10 @@ BOOLEAN _app_unpack_zip (
 
 	if (!mz_zip_reader_init_file_v2 (&zip_archive, pbi->cache_path->buffer, 0, 0, 0))
 	{
-		if (is_not_zip_ptr)
-			*is_not_zip_ptr = TRUE;
+		_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT_CORRUPT), STATUS_DATA_ERROR, pbi->cache_path->buffer, ET_NATIVE);
 
 		return FALSE;
 	}
-
-	if (is_not_zip_ptr)
-		*is_not_zip_ptr = FALSE;
 
 	total_files = mz_zip_reader_get_num_files (&zip_archive);
 
@@ -397,7 +395,7 @@ BOOLEAN _app_unpack_zip (
 	{
 		if (!mz_zip_reader_file_stat (&zip_archive, i, &file_stat))
 		{
-			_r_show_errormessage (hwnd, NULL, STATUS_UNSUCCESSFUL, L"mz_zip_reader_file_stat", ET_NATIVE);
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), STATUS_UNSUCCESSFUL, L"mz_zip_reader_file_stat", ET_NATIVE);
 			is_success = FALSE;
 			break;
 		}
@@ -408,14 +406,14 @@ BOOLEAN _app_unpack_zip (
 
 		if (!NT_SUCCESS (status))
 		{
-			_r_show_errormessage (hwnd, NULL, status, L"_r_str_multibyte2unicode", ET_NATIVE);
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), status, L"_r_str_multibyte2unicode", ET_NATIVE);
 			is_success = FALSE;
 			break;
 		}
 
 		if (!_app_is_entry_path_safe (path->buffer))
 		{
-			_r_show_errormessage (hwnd, NULL, STATUS_DATA_ERROR, L"Invalid archive path", ET_NATIVE);
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), STATUS_DATA_ERROR, L"Invalid archive path", ET_NATIVE);
 			_r_obj_dereference (path);
 			is_success = FALSE;
 			break;
@@ -462,7 +460,7 @@ BOOLEAN _app_unpack_zip (
 
 			if (!mz_zip_reader_extract_to_file (&zip_archive, i, dest_path->buffer, MZ_ZIP_FLAG_DO_NOT_SORT_CENTRAL_DIRECTORY))
 			{
-				_r_show_errormessage (hwnd, NULL, STATUS_UNSUCCESSFUL, dest_path->buffer, ET_NATIVE);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), STATUS_UNSUCCESSFUL, dest_path->buffer, ET_NATIVE);
 				_r_obj_dereference (dest_path);
 				is_success = FALSE;
 				break;
@@ -568,18 +566,50 @@ BOOLEAN _app_installupdate (
 	install_info.binary_dir = staged_dir;
 
 	{
-		BOOLEAN is_not_zip = FALSE;
+		APP_ARCHIVE_FORMAT format = APP_ARCHIVE_FORMAT_UNKNOWN;
+		HANDLE hfile;
 
-		if (_app_unpack_zip (hwnd, &install_info, &bin_name, &is_not_zip))
+		status = _r_fs_createfile (
+			&pbi->cache_path->sr,
+			FILE_OPEN,
+			FILE_GENERIC_READ,
+			FILE_SHARE_READ,
+			FILE_ATTRIBUTE_NORMAL,
+			FILE_SEQUENTIAL_ONLY,
+			FALSE,
+			NULL,
+			&hfile
+		);
+
+		if (NT_SUCCESS (status))
 		{
-			status = SZ_OK;
+			unsigned char sig[6] = {0};
+			ULONG_PTR bytes_read = 0;
+
+			_r_fs_readfile (hfile, sig, sizeof (sig), &bytes_read);
+			NtClose (hfile);
+
+			format = _app_archive_detect_format (sig, bytes_read);
 		}
-		else if (is_not_zip)
+
+		if (format == APP_ARCHIVE_FORMAT_ZIP)
+		{
+			if (_app_unpack_zip (hwnd, &install_info, &bin_name))
+			{
+				status = SZ_OK;
+			}
+			else
+			{
+				status = SZ_ERROR_DATA;
+			}
+		}
+		else if (format == APP_ARCHIVE_FORMAT_7Z)
 		{
 			status = _app_unpack_7zip (hwnd, &install_info, &bin_name);
 		}
 		else
 		{
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_UNSUPPORTED_ARCHIVE), STATUS_DATA_ERROR, pbi->cache_path->buffer, ET_NATIVE);
 			status = SZ_ERROR_DATA;
 		}
 	}
@@ -593,7 +623,7 @@ BOOLEAN _app_installupdate (
 		{
 			if (!_r_fs_exists (&staged_binary->sr))
 			{
-				_r_show_errormessage (hwnd, NULL, STATUS_OBJECT_NAME_NOT_FOUND, staged_binary->buffer, ET_NATIVE);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), STATUS_OBJECT_NAME_NOT_FOUND, staged_binary->buffer, ET_NATIVE);
 				status = STATUS_OBJECT_NAME_NOT_FOUND;
 			}
 
@@ -611,7 +641,7 @@ BOOLEAN _app_installupdate (
 			if (!_app_swap_directory (pbi->binary_dir->buffer, backup_dir->buffer))
 			{
 				win32_error = GetLastError ();
-				_r_show_errormessage (hwnd, NULL, win32_error, pbi->binary_dir->buffer, ET_WINDOWS);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), win32_error, pbi->binary_dir->buffer, ET_WINDOWS);
 				status = (NTSTATUS)win32_error;
 			}
 		}
@@ -623,7 +653,7 @@ BOOLEAN _app_installupdate (
 		if (!_app_swap_directory (staged_dir->buffer, pbi->binary_dir->buffer))
 		{
 			win32_error = GetLastError ();
-			_r_show_errormessage (hwnd, NULL, win32_error, staged_dir->buffer, ET_WINDOWS);
+			_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_EXTRACT), win32_error, staged_dir->buffer, ET_WINDOWS);
 			status = (NTSTATUS)win32_error;
 
 			if (had_existing_dir)

@@ -181,7 +181,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 	if (_r_obj_isstringempty (download_info.string))
 	{
-		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
 		*is_error_ptr = TRUE;
 		_r_inet_destroydownload (&download_info);
 		goto CleanupExit;
@@ -215,7 +215,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 		if (!tag_name || !search)
 		{
-			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
 			*is_error_ptr = TRUE;
 			goto CleanupExit;
 		}
@@ -232,7 +232,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 		if (!tag_name)
 		{
-			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+			_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
 			*is_error_ptr = TRUE;
 			goto CleanupExit;
 		}
@@ -243,7 +243,7 @@ static BOOLEAN _app_checkupdate_github_latest_release (
 
 	if (!assets_ptr || assets_ptr >= assets_limit)
 	{
-		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
 		*is_error_ptr = TRUE;
 		goto CleanupExit;
 	}
@@ -458,7 +458,7 @@ static BOOLEAN _app_checkupdate_snapshot (
 
 	if (_r_obj_isstringempty (download_info.string))
 	{
-		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, L"Configuration was not found.");
+		_r_show_message (hwnd, MB_OK | MB_ICONSTOP, NULL, _r_locale_getstring (IDS_ERROR_CONFIG_NOT_FOUND));
 		*is_error_ptr = TRUE;
 		_r_inet_destroydownload (&download_info);
 		goto CleanupExit;
@@ -802,6 +802,9 @@ BOOLEAN NTAPI _app_downloadupdate_callback (
 
 	pbi = lparam;
 
+	pbi->download_written = total_written;
+	pbi->download_total = total_length;
+
 	percent = total_length ? (LONG)(((ULONG64)total_written * 100) / total_length) : 0;
 
 	if (percent != pbi->progress_percent)
@@ -874,12 +877,14 @@ BOOLEAN _app_downloadupdate (
 
 			if (!NT_SUCCESS (status))
 			{
-				_r_show_errormessage (hwnd, NULL, status, temp_file->buffer, ET_NATIVE);
+				_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_WRITE_FILE), status, temp_file->buffer, ET_NATIVE);
 
 				*is_error_ptr = TRUE;
 				break;
 			}
 
+			pbi->download_written = 0;
+			pbi->download_total = 0;
 			pbi->progress_percent = -1;
 
 			_r_inet_initializedownload (&download_info, hfile, &_app_downloadupdate_callback, pbi);
@@ -890,22 +895,27 @@ BOOLEAN _app_downloadupdate (
 
 			if (status == STATUS_SUCCESS)
 			{
-				status = _r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
-
-				if (!NT_SUCCESS (status))
+				if (_app_download_is_complete (pbi->download_written, pbi->download_total))
 				{
-					_r_log (LOG_LEVEL_ERROR, NULL, L"_app_downloadupdate", status, pbi->cache_path->buffer);
-					_r_show_errormessage (hwnd, NULL, status, pbi->cache_path->buffer, ET_NATIVE);
-					*is_error_ptr = TRUE;
+					status = _r_fs_movefile (&temp_file->sr, &pbi->cache_path->sr, FALSE);
+
+					if (!NT_SUCCESS (status))
+					{
+						_r_log (LOG_LEVEL_ERROR, NULL, L"_app_downloadupdate", status, pbi->cache_path->buffer);
+						_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_SAVE_UPDATE), status, pbi->cache_path->buffer, ET_NATIVE);
+						*is_error_ptr = TRUE;
+						_r_fs_deletefile (&temp_file->sr, NULL);
+						break;
+					}
+
+					SAFE_DELETE_REFERENCE (pbi->download_url);
+
+					is_success = TRUE;
 					_r_fs_deletefile (&temp_file->sr, NULL);
 					break;
 				}
 
-				SAFE_DELETE_REFERENCE (pbi->download_url);
-
-				is_success = TRUE;
-				_r_fs_deletefile (&temp_file->sr, NULL);
-				break;
+				status = STATUS_DATA_ERROR;
 			}
 
 			_r_fs_deletefile (&temp_file->sr, NULL);
@@ -917,7 +927,14 @@ BOOLEAN _app_downloadupdate (
 			}
 			else
 			{
-				_r_show_errormessage (hwnd, NULL, status, pbi->download_url->buffer, ET_WINHTTP);
+				if (status == STATUS_DATA_ERROR)
+				{
+					_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_DOWNLOAD_INCOMPLETE), status, pbi->download_url->buffer, ET_NATIVE);
+				}
+				else
+				{
+					_r_show_errormessage (hwnd, _r_locale_getstring (IDS_ERROR_DOWNLOAD), status, pbi->download_url->buffer, ET_WINHTTP);
+				}
 
 				_r_fs_deletefile (&pbi->cache_path->sr, NULL);
 

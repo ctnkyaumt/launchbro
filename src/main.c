@@ -1122,7 +1122,7 @@ INT_PTR CALLBACK DlgProc (
 
 						if (!_app_taskupdate_createtask ())
 						{
-							_r_show_message (hwnd, MB_ICONERROR, NULL, L"Failed to create scheduled task.");
+							_r_show_message (hwnd, MB_ICONERROR, NULL, _r_locale_getstring (IDS_ERROR_TASK_CREATE));
 							break;
 						}
 					}

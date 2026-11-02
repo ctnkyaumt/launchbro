@@ -68,6 +68,9 @@ typedef struct _BROWSER_INFORMATION
 	LONG instance_id;
 	LONG progress_percent;
 
+	ULONG64 download_written;
+	ULONG64 download_total;
+
 	BOOLEAN is_autodownload;
 	BOOLEAN is_bringtofront;
 	BOOLEAN is_cleanup;

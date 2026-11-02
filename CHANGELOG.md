@@ -1,3 +1,9 @@
+v2.9.15 (2 November 2026)
+- fixed truncated downloads being accepted as complete when network connection drops mid-transfer: verify bytes written match Content-Length and retry failed downloads.
+- detect archive format by signature (zip / 7z) before extracting, preventing corrupt or incomplete zip archives from falling back to 7-zip and showing misleading SzArEx_Open errors.
+- replaced raw internal API error messages with localized, readable instructions across all error dialogs while preserving technical error details for debugging.
+- localized hardcoded error messages for missing update configuration, scheduled task creation, and uninstallation across all 16 supported languages.
+
 v2.9.14 (30 October 2026)
 - fixed launchbro's self-update never completing: the helper script was written as UTF-16, which cmd.exe cannot run, so "updated, restarting" was shown but nothing was replaced and launchbro did not restart. Versions up to 2.9.13 need one manual update to this release.
 - self-update no longer overwrites your launchbro.ini files with the defaults from the release package.

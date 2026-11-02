@@ -7,6 +7,7 @@
 #include "rapp.h"
 
 #include "resource.h"
+#include "update_release.h"
 #include <shellapi.h>
 
 #define LAUNCHBRO_RELEASE_API L"https://api.github.com/repos/ctnkyaumt/launchbro/releases/latest"
@@ -306,16 +307,29 @@ CleanupExit:
 	return is_success;
 }
 
+typedef struct _APP_SELF_DOWNLOAD_CONTEXT
+{
+	HWND hwnd;
+	ULONG64 written;
+	ULONG64 total;
+} APP_SELF_DOWNLOAD_CONTEXT;
+
 static BOOLEAN NTAPI _app_self_download_callback (
 	_In_ ULONG total_written,
 	_In_ ULONG total_length,
 	_In_ PVOID lparam
 )
 {
-	HWND hwnd = (HWND)lparam;
+	APP_SELF_DOWNLOAD_CONTEXT* ctx = (APP_SELF_DOWNLOAD_CONTEXT*)lparam;
 
-	if (hwnd)
-		_app_setstatus (hwnd, NULL, NULL, _r_locale_getstring (IDS_UPDATE_DOWNLOADING), total_written, total_length);
+	if (ctx)
+	{
+		ctx->written = total_written;
+		ctx->total = total_length;
+
+		if (ctx->hwnd)
+			_app_setstatus (ctx->hwnd, NULL, NULL, _r_locale_getstring (IDS_UPDATE_DOWNLOADING), total_written, total_length);
+	}
 
 	return TRUE;
 }
@@ -326,6 +340,7 @@ BOOLEAN _app_download_self_update (
 	_Out_ PR_STRING* out_path_ptr
 )
 {
+	APP_SELF_DOWNLOAD_CONTEXT download_ctx = {0};
 	R_DOWNLOAD_INFO download_info;
 	PR_STRING proxy_string;
 	PR_STRING temp_file;
@@ -338,6 +353,7 @@ BOOLEAN _app_download_self_update (
 	const INT max_retries = 3;
 
 	*out_path_ptr = NULL;
+	download_ctx.hwnd = hwnd;
 
 	temp_dir = _r_sys_gettempdirectory ();
 
@@ -374,7 +390,10 @@ BOOLEAN _app_download_self_update (
 			if (!NT_SUCCESS (status))
 				break;
 
-			_r_inet_initializedownload (&download_info, hfile, &_app_self_download_callback, hwnd);
+			download_ctx.written = 0;
+			download_ctx.total = 0;
+
+			_r_inet_initializedownload (&download_info, hfile, &_app_self_download_callback, &download_ctx);
 
 			status = _r_inet_begindownload (hsession, &download_url->sr, &download_info);
 
@@ -382,9 +401,14 @@ BOOLEAN _app_download_self_update (
 
 			if (status == STATUS_SUCCESS)
 			{
-				is_success = TRUE;
-				*out_path_ptr = temp_file;
-				break;
+				if (_app_download_is_complete (download_ctx.written, download_ctx.total))
+				{
+					is_success = TRUE;
+					*out_path_ptr = temp_file;
+					break;
+				}
+
+				status = STATUS_DATA_ERROR;
 			}
 
 			_r_fs_deletefile (&temp_file->sr, NULL);

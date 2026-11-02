@@ -790,7 +790,7 @@ VOID _app_uninstall_app (
 
 	if (!NT_SUCCESS (status))
 	{
-		_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, L"Uninstall failed.");
+		_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, _r_locale_getstring (IDS_ERROR_UNINSTALL));
 		goto CleanupExit;
 	}
 
@@ -805,7 +805,7 @@ VOID _app_uninstall_app (
 
 		if (!bom_ok || !content_ok)
 		{
-			_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, L"Uninstall failed.");
+			_r_show_message (hwnd, MB_OK | MB_ICONERROR, NULL, _r_locale_getstring (IDS_ERROR_UNINSTALL));
 			goto CleanupExit;
 		}
 	}

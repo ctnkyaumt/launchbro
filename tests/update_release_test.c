@@ -58,6 +58,25 @@ int main (void)
 	assert (_app_release_revision_length (L"12a") == 0);
 	assert (_app_release_revision_length (L"<html>") == 0);
 
-	puts ("43 release asset/version regression checks passed.");
+	assert (_app_download_is_complete (11335889, 200807142) == 0);
+	assert (_app_download_is_complete (200807142, 200807142) == 1);
+	assert (_app_download_is_complete (11335889, 0) == 1);
+	assert (_app_download_is_complete (0, 0) == 1);
+
+	const unsigned char zip_hdr[] = { 'P', 'K', 0x03, 0x04, 0x14, 0x00 };
+	const unsigned char zip_empty_hdr[] = { 'P', 'K', 0x05, 0x06, 0x00, 0x00 };
+	const unsigned char sz_hdr[] = { '7', 'z', 0xBC, 0xAF, 0x27, 0x1C };
+	const unsigned char doctype_hdr[] = "<!DOCTYPE html>";
+	const unsigned char short_hdr[] = { 'P', 'K', 0x03 };
+
+	assert (_app_archive_detect_format (zip_hdr, sizeof (zip_hdr)) == APP_ARCHIVE_FORMAT_ZIP);
+	assert (_app_archive_detect_format (zip_empty_hdr, sizeof (zip_empty_hdr)) == APP_ARCHIVE_FORMAT_ZIP);
+	assert (_app_archive_detect_format (sz_hdr, sizeof (sz_hdr)) == APP_ARCHIVE_FORMAT_7Z);
+	assert (_app_archive_detect_format (doctype_hdr, sizeof (doctype_hdr) - 1) == APP_ARCHIVE_FORMAT_UNKNOWN);
+	assert (_app_archive_detect_format (NULL, 0) == APP_ARCHIVE_FORMAT_UNKNOWN);
+	assert (_app_archive_detect_format (doctype_hdr, 0) == APP_ARCHIVE_FORMAT_UNKNOWN);
+	assert (_app_archive_detect_format (short_hdr, sizeof (short_hdr)) == APP_ARCHIVE_FORMAT_UNKNOWN);
+
+	puts ("54 release asset/version/download regression checks passed.");
 	return 0;
 }

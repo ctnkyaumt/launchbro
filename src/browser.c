@@ -64,7 +64,7 @@ VOID _app_openbrowser (
 
 	if (_r_obj_isstringempty (pbi->binary_path) || !_r_fs_exists (&pbi->binary_path->sr))
 	{
-		_r_show_errormessage (_r_app_gethwnd (), NULL, STATUS_OBJECT_PATH_NOT_FOUND, _r_obj_getstring (pbi->binary_path), ET_NATIVE);
+		_r_show_errormessage (_r_app_gethwnd (), _r_locale_getstring (IDS_ERROR_START_BROWSER), STATUS_OBJECT_PATH_NOT_FOUND, _r_obj_getstring (pbi->binary_path), ET_NATIVE);
 
 		return;
 	}
@@ -121,7 +121,7 @@ VOID _app_openbrowser (
 	status = _r_sys_createprocess (pbi->binary_path->buffer, cmdline->buffer, pbi->binary_dir->buffer, FALSE);
 
 	if (!NT_SUCCESS (status))
-		_r_show_errormessage (_r_app_gethwnd (), NULL, status, pbi->binary_path->buffer, ET_NATIVE);
+		_r_show_errormessage (_r_app_gethwnd (), _r_locale_getstring (IDS_ERROR_START_BROWSER), status, pbi->binary_path->buffer, ET_NATIVE);
 
 	_r_obj_dereference (args_string);
 	_r_obj_dereference (cmdline);

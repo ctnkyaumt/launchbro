@@ -171,6 +171,17 @@ BEGIN
 	IDS_PROFILE_EXPORTED "Profile exported successfully."
 	IDS_PROFILE_IMPORTED "Profile imported successfully."
 	IDS_CREATESHORTCUTONUPDATE_CHK "Create shortcuts on desktop after update"
+	IDS_ERROR_DOWNLOAD_INCOMPLETE "The Chromium download was incomplete. It will be retried next time."
+	IDS_ERROR_EXTRACT "Could not extract the Chromium update. Your current version was kept."
+	IDS_ERROR_EXTRACT_CORRUPT "The update archive is corrupt or incomplete."
+	IDS_ERROR_UNSUPPORTED_ARCHIVE "The downloaded file is not a supported archive."
+	IDS_ERROR_START_BROWSER "Could not start Chromium."
+	IDS_ERROR_WRITE_FILE "Could not write update file."
+	IDS_ERROR_SAVE_UPDATE "Could not save update file."
+	IDS_ERROR_DOWNLOAD "Could not download the update."
+	IDS_ERROR_CONFIG_NOT_FOUND "Update information was not found."
+	IDS_ERROR_TASK_CREATE "Failed to create scheduled task."
+	IDS_ERROR_UNINSTALL "Uninstall failed."
 END
 
 //

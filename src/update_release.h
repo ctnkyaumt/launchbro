@@ -1,8 +1,47 @@
 // Release asset policy, shared with the dependency-free regression tests.
 #pragma once
 
+#include <stddef.h>
 #include <wchar.h>
 #include <wctype.h>
+
+typedef enum _APP_ARCHIVE_FORMAT
+{
+	APP_ARCHIVE_FORMAT_UNKNOWN = 0,
+	APP_ARCHIVE_FORMAT_ZIP,
+	APP_ARCHIVE_FORMAT_7Z,
+} APP_ARCHIVE_FORMAT;
+
+// a zero expected length means the server sent no Content-Length
+static int _app_download_is_complete (unsigned long long written, unsigned long long expected)
+{
+	return expected == 0 || written == expected;
+}
+
+static APP_ARCHIVE_FORMAT _app_archive_detect_format (const unsigned char* buffer, size_t length)
+{
+	if (!buffer)
+		return APP_ARCHIVE_FORMAT_UNKNOWN;
+
+	if (length >= 4 && buffer[0] == 'P' && buffer[1] == 'K')
+	{
+		if ((buffer[2] == 0x03 && buffer[3] == 0x04) ||
+			(buffer[2] == 0x05 && buffer[3] == 0x06))
+		{
+			return APP_ARCHIVE_FORMAT_ZIP;
+		}
+	}
+
+	if (length >= 6 &&
+		buffer[0] == 0x37 && buffer[1] == 0x7A &&
+		buffer[2] == 0xBC && buffer[3] == 0xAF &&
+		buffer[4] == 0x27 && buffer[5] == 0x1C)
+	{
+		return APP_ARCHIVE_FORMAT_7Z;
+	}
+
+	return APP_ARCHIVE_FORMAT_UNKNOWN;
+}
 
 enum
 {
